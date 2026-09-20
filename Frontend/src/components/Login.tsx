@@ -45,7 +45,7 @@ const Login = () => {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-600 focus:border-indigo-600 outline-none transition"
+              className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-[#20b2aa] focus:border-[#20b2aa] outline-none transition"
               placeholder="admin@upse.edu.ec"
               required
             />
@@ -57,7 +57,7 @@ const Login = () => {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-600 focus:border-indigo-600 outline-none transition"
+              className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-[#20b2aa] focus:border-[#20b2aa] outline-none transition"
               placeholder="••••••"
               required
             />
@@ -65,7 +65,7 @@ const Login = () => {
 
           <button
             type="submit"
-            className="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 transition"
+            className="w-full bg-[#20b2aa] text-white font-bold py-3 rounded-lg hover:bg-[#008080] transition"
           >
             Iniciar Sesión
           </button>

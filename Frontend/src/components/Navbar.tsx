@@ -60,7 +60,7 @@ const Navbar = ({ onMenuClick, onToggleCollapse, isCollapsed }: NavbarProps) => 
         >
           <span className="text-lg sm:text-xl">🛒</span>
           {totalItems > 0 && (
-            <span className="absolute top-0 right-0 bg-indigo-600 text-white text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full transform translate-x-1 -translate-y-1">
+            <span className="absolute top-0 right-0 bg-[#00ced1] text-white text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full transform translate-x-1 -translate-y-1">
               {totalItems}
             </span>
           )}
