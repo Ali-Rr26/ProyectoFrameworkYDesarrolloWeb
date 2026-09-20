@@ -7,9 +7,15 @@ const Layout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isCollapsed, setIsCollapsed] = useState(false);
 
+  const closeSidebar = () => setSidebarOpen(false);
+
   return (
     <div className="flex h-screen bg-slate-50">
-      <Sidebar isOpen={sidebarOpen} isCollapsed={isCollapsed} />
+      <Sidebar
+        isOpen={sidebarOpen}
+        isCollapsed={isCollapsed}
+        onCloseSidebar={closeSidebar}
+      />
 
       {/* Área de Contenido Principal */}
       <div className="flex-1 flex flex-col overflow-hidden">
