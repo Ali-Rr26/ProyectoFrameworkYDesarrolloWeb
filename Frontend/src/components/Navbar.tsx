@@ -1,4 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
+import { useState } from "react";
 import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
 import { Menu, ChevronsLeft, ChevronsRight } from 'lucide-react';
@@ -11,12 +12,14 @@ interface NavbarProps {
 }
 
 const Navbar = ({ onMenuClick, onToggleCollapse, isCollapsed }: NavbarProps) => {
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const { totalItems } = useCart();
   const { logout, userEmail } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = () => {
     logout();
+    setUserMenuOpen(false);
     navigate("/login");
   };
 
@@ -69,15 +72,19 @@ const Navbar = ({ onMenuClick, onToggleCollapse, isCollapsed }: NavbarProps) => 
           </span>
 
           <div className="relative group cursor-pointer pb-2">
-            <div className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden border border-slate-300 flex items-center justify-center flex-shrink-0">
+            <button
+              onClick={() => setUserMenuOpen(!userMenuOpen)}
+              className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden border border-slate-300 flex items-center justify-center flex-shrink-0 hover:bg-slate-300 transition"
+              aria-label="Menú de usuario"
+            >
               <img
                 src="https://fastly.picsum.photos/id/64/4326/2884.jpg?hmac=9_SzX666YRpR_fOyYStXpfSiJ_edO3ghlSRnH2w09Kg"
                 alt="Avatar del usuario"
                 className="w-full h-full object-cover"
               />
-            </div>
+            </button>
 
-            <div className="absolute right-0 top-full mt-1 w-36 bg-white border border-slate-200 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+            <div className={`absolute right-0 top-full mt-1 w-36 bg-white border border-slate-200 rounded-lg shadow-lg transition-all duration-200 z-50 ${userMenuOpen ? "opacity-100 visible" : "opacity-0 invisible"} lg:group-hover:opacity-100 lg:group-hover:visible lg:opacity-0 lg:invisible`}>
               <button
                 onClick={handleLogout}
                 className="w-full text-left px-4 py-2 text-sm text-red-600 font-semibold hover:bg-red-50 rounded-md transition-colors"
