@@ -26,7 +26,7 @@ const Sidebar = ({ isOpen, isCollapsed, onCloseSidebar }: SidebarProps) => {
       )}
 
       {/* Sidebar */}
-      <aside className={`${isOpen ? "w-64" : "w-0"} fixed lg:static left-0 top-0 h-screen lg:h-auto bg-[#00ced1] text-white flex flex-col transition-all duration-300 overflow-hidden border-r-2 border-[#009DA6] z-40 ${isCollapsed ? "lg:w-20" : "lg:w-64"}`}>
+      <aside className={`${isOpen ? "w-64" : "w-0"} fixed lg:static left-0 top-0 h-screen lg:h-auto bg-[#40d9d8] text-white flex flex-col transition-all duration-300 overflow-hidden border-r-2 border-[#20b2aa] z-40 ${isCollapsed ? "lg:w-20" : "lg:w-64"}`}>
       <div className={`p-6 ${isCollapsed ? "lg:p-3" : ""} border-b border-[#20b2aa] flex items-center justify-center group relative`}>
         <Store size={32} className="flex-shrink-0" />
         <span className="text-2xl font-bold whitespace-nowrap ml-3 lg:hidden">MultiCatálogo</span>
@@ -45,7 +45,7 @@ const Sidebar = ({ isOpen, isCollapsed, onCloseSidebar }: SidebarProps) => {
         <Link
           to="/"
           onClick={onCloseSidebar}
-          className={`flex items-center gap-3 ${isCollapsed ? "lg:flex lg:justify-center lg:gap-0" : "lg:flex lg:items-center lg:gap-3"} p-3 rounded hover:bg-white hover:bg-opacity-20 transition-all duration-200 group relative`}
+          className={`flex items-center gap-3 ${isCollapsed ? "lg:flex lg:justify-center lg:gap-0" : "lg:flex lg:items-center lg:gap-3"} p-3 rounded hover:bg-[#40e5e8] transition-all duration-200 group relative`}
           title="Dashboard"
         >
           <LayoutDashboard size={ICON_SIZES.SIDEBAR} className="flex-shrink-0" />
@@ -61,7 +61,7 @@ const Sidebar = ({ isOpen, isCollapsed, onCloseSidebar }: SidebarProps) => {
         <Link
           to="/catalogo"
           onClick={onCloseSidebar}
-          className={`flex items-center gap-3 ${isCollapsed ? "lg:flex lg:justify-center lg:gap-0" : "lg:flex lg:items-center lg:gap-3"} p-3 rounded hover:bg-white hover:bg-opacity-20 transition-all duration-200 group relative`}
+          className={`flex items-center gap-3 ${isCollapsed ? "lg:flex lg:justify-center lg:gap-0" : "lg:flex lg:items-center lg:gap-3"} p-3 rounded hover:bg-[#40e5e8] transition-all duration-200 group relative`}
           title="Catálogo"
         >
           <PackageSearch size={ICON_SIZES.SIDEBAR} className="flex-shrink-0" />
@@ -77,7 +77,7 @@ const Sidebar = ({ isOpen, isCollapsed, onCloseSidebar }: SidebarProps) => {
         <Link
           to="/mi-red"
           onClick={onCloseSidebar}
-          className={`flex items-center gap-3 ${isCollapsed ? "lg:flex lg:justify-center lg:gap-0" : "lg:flex lg:items-center lg:gap-3"} p-3 rounded hover:bg-white hover:bg-opacity-20 transition-all duration-200 group relative`}
+          className={`flex items-center gap-3 ${isCollapsed ? "lg:flex lg:justify-center lg:gap-0" : "lg:flex lg:items-center lg:gap-3"} p-3 rounded hover:bg-[#40e5e8] transition-all duration-200 group relative`}
           title="Mi Red"
         >
           <Contact size={ICON_SIZES.SIDEBAR} className="flex-shrink-0" />

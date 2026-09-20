@@ -31,7 +31,7 @@ const MiRed = () => {
               >
                 <td className="p-4 text-slate-700">{ref.nombre}</td>
                 <td className="p-4 text-slate-500">{ref.nivel}</td>
-                <td className="p-4 text-indigo-600 font-medium">
+                <td className="p-4 text-[#20b2aa] font-medium">
                   {ref.ventas}
                 </td>
               </tr>

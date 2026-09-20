@@ -26,7 +26,7 @@ const Carrito = () => {
                   </div>
                 </div>
                 <div className="flex items-center gap-6">
-                  <p className="font-bold text-indigo-600">${(item.precio * item.cantidad).toFixed(2)}</p>
+                  <p className="font-bold text-[#20b2aa]">${(item.precio * item.cantidad).toFixed(2)}</p>
                   <button 
                     onClick={() => removeFromCart(item.id)}
                     className="text-red-500 hover:text-red-700 transition"
@@ -48,9 +48,9 @@ const Carrito = () => {
             </div>
             <div className="flex justify-between items-center mb-6">
               <span className="text-slate-800 font-bold">Total a Pagar</span>
-              <span className="text-2xl font-bold text-indigo-600">${totalPrice.toFixed(2)}</span>
+              <span className="text-2xl font-bold text-[#20b2aa]">${totalPrice.toFixed(2)}</span>
             </div>
-            <button className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition">
+            <button className="w-full bg-[#20b2aa] text-white py-3 rounded-lg font-semibold hover:bg-[#008080] transition">
               Proceder al Pago
             </button>
           </div>

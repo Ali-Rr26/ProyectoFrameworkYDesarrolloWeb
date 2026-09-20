@@ -9,19 +9,19 @@ const Dashboard = () => {
           <p className="text-sm text-slate-500 uppercase font-semibold">
             Ventas Totales
           </p>
-          <p className="text-3xl font-bold text-indigo-600">$12,450.00</p>
+          <p className="text-3xl font-bold text-[#20b2aa]">$12,450.00</p>
         </div>
         <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-100">
           <p className="text-sm text-slate-500 uppercase font-semibold">
             Referidos Activos
           </p>
-          <p className="text-3xl font-bold text-indigo-600">24</p>
+          <p className="text-3xl font-bold text-[#20b2aa]">24</p>
         </div>
         <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-100">
           <p className="text-sm text-slate-500 uppercase font-semibold">
             Nivel Actual
           </p>
-          <p className="text-3xl font-bold text-indigo-600">Diamante</p>
+          <p className="text-3xl font-bold text-[#20b2aa]">Diamante</p>
         </div>
       </div>
     </div>
