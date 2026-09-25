@@ -15,4 +15,7 @@ func SetupRoutes(app *fiber.App) {
 
 	// Definimos una ruta HTTP GET en "/api/productos" y la enlazamos a la función GetProductos del paquete controllers.
 	app.Get("/api/productos", controllers.GetProductos)
+
+	// Definimos una ruta HTTP GET en "/api/network" y la enlazamos a la función GetNetwork del paquete controllers.
+	app.Get("/api/network", controllers.GetNetwork)
 }
