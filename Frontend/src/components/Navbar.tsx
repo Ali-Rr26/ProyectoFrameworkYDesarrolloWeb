@@ -1,5 +1,5 @@
+import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useState } from "react";
 import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
 import { Menu, ChevronsLeft, ChevronsRight } from 'lucide-react';
@@ -12,16 +12,27 @@ interface NavbarProps {
 }
 
 const Navbar = ({ onMenuClick, onToggleCollapse, isCollapsed }: NavbarProps) => {
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const { totalItems } = useCart();
-  const { logout, userEmail } = useAuth();
+  const { logout, user } = useAuth();
   const navigate = useNavigate();
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const handleLogout = () => {
     logout();
-    setUserMenuOpen(false);
     navigate("/login");
   };
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   return (
     <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-8">
@@ -48,8 +59,8 @@ const Navbar = ({ onMenuClick, onToggleCollapse, isCollapsed }: NavbarProps) => 
           )}
         </button>
 
-        <h2 className="text-slate-600 font-medium text-sm sm:text-lg">
-          Panel de Administración
+        <h2 className="text-slate-600 font-medium text-sm sm:text-lg hidden sm:block">
+          {user?.rol === "admin" ? "Panel de Administración" : "Tienda MultiCatálogo"}
         </h2>
       </div>
       <div className="flex items-center gap-2 sm:gap-6">
@@ -68,12 +79,22 @@ const Navbar = ({ onMenuClick, onToggleCollapse, isCollapsed }: NavbarProps) => 
 
         <div className="flex items-center gap-2 sm:gap-4">
           <span className="hidden sm:block text-xs sm:text-sm text-slate-500 truncate max-w-xs">
-            {userEmail}
+            {user?.email}
           </span>
 
-          <div className="relative group cursor-pointer pb-2">
+          <span
+            className={`hidden md:inline-block text-xs font-semibold px-2 py-1 rounded-full uppercase ${
+              user?.rol === "admin"
+                ? "bg-[#40d9d8] text-white"
+                : "bg-sky-100 text-sky-700"
+            }`}
+          >
+            {user?.rol}
+          </span>
+
+          <div className="relative group cursor-pointer pb-2" ref={dropdownRef}>
             <button
-              onClick={() => setUserMenuOpen(!userMenuOpen)}
+              onClick={() => setIsOpen(!isOpen)}
               className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden border border-slate-300 flex items-center justify-center flex-shrink-0 hover:bg-slate-300 transition"
               aria-label="Menú de usuario"
             >
@@ -84,7 +105,9 @@ const Navbar = ({ onMenuClick, onToggleCollapse, isCollapsed }: NavbarProps) => 
               />
             </button>
 
-            <div className={`absolute right-0 top-full mt-1 w-36 bg-white border border-slate-200 rounded-lg shadow-lg transition-all duration-200 z-50 ${userMenuOpen ? "opacity-100 visible" : "opacity-0 invisible"} lg:group-hover:opacity-100 lg:group-hover:visible lg:opacity-0 lg:invisible`}>
+            <div className={`absolute right-0 top-full mt-1 w-36 bg-white border border-slate-200 rounded-lg shadow-lg transition-all duration-200 z-50 ${
+              isOpen ? "opacity-100 visible" : "opacity-0 invisible group-hover:opacity-100 group-hover:visible"
+            }`}>
               <button
                 onClick={handleLogout}
                 className="w-full text-left px-4 py-2 text-sm text-red-600 font-semibold hover:bg-red-50 rounded-md transition-colors"
