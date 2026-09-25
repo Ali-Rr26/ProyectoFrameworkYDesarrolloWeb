@@ -2,6 +2,7 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { API_URL } from '../data/constants';
 
 const Login = () => {
   const [email, setEmail] = useState<string>('');
@@ -18,7 +19,7 @@ const Login = () => {
     setError('');
 
     try {
-      const response = await fetch('http://localhost:4000/api/login', {
+      const response = await fetch(`${API_URL}/api/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -35,8 +36,13 @@ const Login = () => {
 
       const data = await response.json();
       setError('');
-      login(data.email);
-      navigate('/');
+
+      // La API devuelve el rol (admin | cliente) junto al correo
+      const rol = data.rol === 'admin' ? 'admin' : 'cliente';
+      login({ email: data.email, rol });
+
+      // Redirigimos según el rol: admin al Dashboard, cliente a la Tienda
+      navigate(rol === 'admin' ? '/' : '/tienda');
     } catch (err) {
       setError('Error al conectar con el servidor');
       console.error(err);
@@ -99,9 +105,14 @@ const Login = () => {
             disabled={loading}
             className="w-full bg-[#20b2aa] text-white font-bold py-3 rounded-lg hover:bg-[#008080] transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
+            {loading ? 'Validando...' : 'Iniciar Sesión'}
           </button>
         </form>
+        <div className="mt-6 p-4 bg-slate-50 rounded-lg border border-slate-200 text-xs text-slate-600 space-y-1">
+          <p className="font-semibold text-slate-700">Cuentas de prueba:</p>
+          <p>👑 Admin: <span className="font-mono">admin@upse.edu.ec / 123456</span></p>
+          <p>🛍️ Cliente: <span className="font-mono">cliente@upse.edu.ec / 123456</span></p>
+        </div>
       </div>
     </div>
   );
