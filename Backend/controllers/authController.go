@@ -15,7 +15,18 @@ func Login(c *fiber.Ctx) error {
 	// Intentamos parsear (transformar) el cuerpo JSON entrante y guardarlo en la variable 'req'.
 	if err := c.BodyParser(&req); err != nil {
 		// Si ocurre un error al parsear (ej. JSON mal formado), retornamos un estado HTTP 400 (Bad Request).
-		return c.Status(400).JSON(fiber.Map{"error": "Cuerpo de petición inválido"})
+		return c.Status(400).JSON(models.APIError{
+			Status:  400,
+			Message: "Cuerpo de petición inválido",
+		})
+	}
+
+	// Validar que email y password no estén vacíos.
+	if req.Email == "" || req.Password == "" {
+		return c.Status(400).JSON(models.APIError{
+			Status:  400,
+			Message: "Email y password son requeridos",
+		})
 	}
 
 	// Evaluamos si el email y la contraseña coinciden con las credenciales predefinidas.
@@ -29,6 +40,9 @@ func Login(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"token": "fake-jwt-token-456", "email": req.Email, "rol": "cliente"})
 	default:
 		// Si las credenciales son incorrectas, retornamos un estado HTTP 401 (No autorizado) con un mensaje de error.
-		return c.Status(401).JSON(fiber.Map{"error": "Credenciales incorrectas"})
+		return c.Status(401).JSON(models.APIError{
+			Status:  401,
+			Message: "Credenciales incorrectas",
+		})
 	}
 }

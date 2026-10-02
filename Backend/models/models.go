@@ -27,6 +27,16 @@ type Producto struct {
 	Galeria []string `json:"galeria"`
 }
 
+// APIError estandariza respuestas de error HTTP.
+type APIError struct {
+	// Status es el código HTTP de error.
+	Status  int         `json:"status"`
+	// Message es la descripción del error.
+	Message string      `json:"message"`
+	// Details contiene información adicional (opcional).
+	Details interface{} `json:"details,omitempty"`
+}
+
 // Referido define la estructura de un nodo en el árbol multinivel de referidos.
 type Referido struct {
 	// ID es el identificador único del referido.
