@@ -1,17 +1,24 @@
 export const API_URL = 'http://localhost:4000';
 
-export const TASA_COMISION: Record<number, number> = {
+// Porcentaje de comisión que genera cada nivel de la red (1 = referido directo)
+export const COMMISSION_RATES: Record<number, number> = {
   1: 0.10,
   2: 0.05,
   3: 0.02,
 };
 
-export const METODOS_PAGO = ['Tarjeta de crédito', 'Transferencia bancaria', 'Efectivo contra entrega'];
+// Rangos del distribuidor según sus referidos directos (texto visible en la interfaz)
+export const RANKS = ['Bronce', 'Plata', 'Oro', 'Diamante'] as const;
 
-export const NIVELES = ['Bronce', 'Plata', 'Oro', 'Diamante'];
+// Etiqueta visible de cada rol que entrega la API
+export const ROLE_LABELS: Record<string, string> = {
+  admin: 'admin',
+  customer: 'cliente',
+};
 
-export const COLORES_NIVEL: Record<number, { badge: string; border: string; tasa: string }> = {
-  1: { badge: 'bg-teal-100 text-teal-700', border: 'border-teal-200', tasa: '10 %' },
-  2: { badge: 'bg-cyan-100 text-cyan-700', border: 'border-cyan-200', tasa: '5 %' },
-  3: { badge: 'bg-emerald-100 text-emerald-700', border: 'border-emerald-200', tasa: '2 %' },
+// Estilos de cada nivel de la red en el árbol de referidos
+export const LEVEL_STYLES: Record<number, { badge: string; border: string; rate: string }> = {
+  1: { badge: 'bg-teal-100 text-teal-700', border: 'border-teal-200', rate: '10 %' },
+  2: { badge: 'bg-cyan-100 text-cyan-700', border: 'border-cyan-200', rate: '5 %' },
+  3: { badge: 'bg-emerald-100 text-emerald-700', border: 'border-emerald-200', rate: '2 %' },
 };
