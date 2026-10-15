@@ -8,20 +8,37 @@ import (
 	"multicatalogo-backend/controllers"
 )
 
-// SetupRoutes es una función que recibe un puntero a la aplicación Fiber (*fiber.App) para inyectarle las rutas.
-func SetupRoutes(app *fiber.App) {
-	// Definimos una ruta HTTP POST en "/api/login" y la enlazamos a la función Login del paquete controllers.
-	app.Post("/api/login", controllers.Login)
+// SetupRoutes recibe la aplicación Fiber y el Handler (con el repositorio inyectado) para registrar las rutas.
+func SetupRoutes(app *fiber.App, h *controllers.Handler) {
+	// ===== Rutas públicas =====
+	// Inicio de sesión: devuelve el JWT.
+	app.Post("/api/login", h.Login)
 
-	// Definimos una ruta HTTP GET en "/api/productos" y la enlazamos a la función GetProductos del paquete controllers.
-	app.Get("/api/productos", controllers.GetProductos)
+	// Catálogo de productos y detalle por ID.
+	app.Get("/api/products", h.GetProducts)
+	app.Get("/api/products/:id", h.GetProductByID)
 
-	// Definimos una ruta HTTP GET en "/api/productos/:id" para obtener un producto específico por su ID.
-	app.Get("/api/productos/:id", controllers.GetProductoPorID)
-
-	// Definimos una ruta HTTP GET en "/api/network" y la enlazamos a la función GetNetwork del paquete controllers.
-	app.Get("/api/network", controllers.GetNetwork)
-
-	// Definimos una ruta HTTP GET en "/api/health" para verificar el estado del servidor.
+	// Estado del servidor y de la conexión a PostgreSQL.
 	app.Get("/api/health", controllers.Health)
+	app.Get("/api/health/db", h.HealthDB)
+
+	// Registro público de clientes (rol customer fijo).
+	app.Post("/api/users", h.RegisterUser)
+
+	// ===== Rutas autenticadas: exigen "Authorization: Bearer <JWT>" =====
+	// El middleware se declara por ruta (no por grupo) para que las rutas públicas
+	// nunca pasen por él, sin depender del orden de registro.
+	auth := h.RequireAuth
+	adminOnly := h.RequireRole("admin")
+
+	// Red de referidos: el cliente ve la suya; el admin puede consultar cualquiera.
+	app.Get("/api/network", auth, h.GetNetwork)
+
+	// Compra: el comprador se toma del token.
+	app.Get("/api/payment-methods", auth, h.GetPaymentMethods)
+	app.Post("/api/orders", auth, h.CreateOrder)
+
+	// Solo administrador.
+	app.Get("/api/users", auth, adminOnly, h.GetUsers)
+	app.Post("/api/products", auth, adminOnly, h.CreateProduct)
 }

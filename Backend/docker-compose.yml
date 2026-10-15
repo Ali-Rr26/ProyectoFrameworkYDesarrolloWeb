@@ -1,0 +1,25 @@
+# Levanta PostgreSQL 16 para desarrollo local.
+# Uso: docker compose up -d   (desde la carpeta Backend)
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: multicatalogo-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-multicatalogo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-multicatalogo}
+      POSTGRES_DB: ${POSTGRES_DB:-multicatalogo}
+    ports:
+      # Puerto del host configurable: 5434 por defecto para no chocar con otros PostgreSQL (nativo en 5432, otros contenedores).
+      - "${POSTGRES_PORT:-5434}:5432"
+    volumes:
+      # Volumen nombrado: los datos sobreviven a reinicios del contenedor.
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-multicatalogo} -d ${POSTGRES_DB:-multicatalogo}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:

@@ -1,10 +1,6 @@
-import { API_URL } from '../data/constants';
-import type { Referido } from '../data/red';
+import type { NetworkNode } from '../data/network';
+import { apiFetch } from './apiClient';
 
-export const getNetwork = async (): Promise<Referido> => {
-  const response = await fetch(`${API_URL}/api/network`);
-  if (!response.ok) {
-    throw new Error('Error al traer red de referidos');
-  }
-  return response.json();
-};
+// Requiere token: el backend devuelve la red del usuario autenticado
+// (o la red raíz configurada cuando consulta un administrador).
+export const getNetwork = (): Promise<NetworkNode> => apiFetch<NetworkNode>('/api/network');

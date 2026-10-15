@@ -2,6 +2,7 @@ import { Link, useLocation } from "react-router-dom";
 import { LayoutDashboard, PackageSearch, Contact, Store } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { ICON_SIZES } from '../constants/ui';
+import { ROLE_LABELS } from '../data/constants';
 
 // Definimos las opciones de navegación según el rol (Tema 5)
 interface NavItem {
@@ -9,7 +10,7 @@ interface NavItem {
   label: string;
   title: string;
   icon: React.ReactNode;
-  soloAdmin?: boolean;
+  adminOnly?: boolean;
 }
 
 interface SidebarProps {
@@ -28,32 +29,32 @@ const Sidebar = ({ isOpen, isCollapsed, onCloseSidebar }: SidebarProps) => {
       to: "/",
       label: "Dashboard",
       title: "Dashboard",
-      soloAdmin: true,
+      adminOnly: true,
       icon: <LayoutDashboard size={ICON_SIZES.SIDEBAR} className="flex-shrink-0" />,
     },
     {
-      to: "/tienda",
+      to: "/store",
       label: "Tienda",
       title: "Tienda",
       icon: <Store size={ICON_SIZES.SIDEBAR} className="flex-shrink-0" />,
     },
     {
-      to: "/catalogo",
+      to: "/catalog",
       label: "Catálogo",
       title: "Catálogo",
       icon: <PackageSearch size={ICON_SIZES.SIDEBAR} className="flex-shrink-0" />,
     },
     {
-      to: "/mi-red",
+      to: "/my-network",
       label: "Mi Red",
       title: "Mi Red",
-      soloAdmin: true,
+      adminOnly: true,
       icon: <Contact size={ICON_SIZES.SIDEBAR} className="flex-shrink-0" />,
     },
   ];
 
   // Filtramos las opciones según el rol del usuario
-  const items = NAV_ITEMS.filter((item) => !item.soloAdmin || user?.rol === "admin");
+  const items = NAV_ITEMS.filter((item) => !item.adminOnly || user?.role === "admin");
 
   return (
     <>
@@ -87,7 +88,7 @@ const Sidebar = ({ isOpen, isCollapsed, onCloseSidebar }: SidebarProps) => {
         <nav className="flex-1 p-2 space-y-2 flex flex-col">
           {items.map((item) => {
             // Resaltamos la opción activa según la ruta actual
-            const esActivo =
+            const isActive =
               item.to === "/"
                 ? pathname === "/"
                 : pathname.startsWith(item.to);
@@ -98,7 +99,7 @@ const Sidebar = ({ isOpen, isCollapsed, onCloseSidebar }: SidebarProps) => {
                 to={item.to}
                 onClick={onCloseSidebar}
                 className={`flex items-center gap-3 ${isCollapsed ? "lg:flex lg:justify-center lg:gap-0" : "lg:flex lg:items-center lg:gap-3"} p-3 rounded transition-all duration-200 group relative ${
-                  esActivo
+                  isActive
                     ? "bg-[#20b2aa] text-white"
                     : "hover:bg-[#40e5e8]"
                 }`}
@@ -120,10 +121,10 @@ const Sidebar = ({ isOpen, isCollapsed, onCloseSidebar }: SidebarProps) => {
         {/* Footer: mostrar rol del usuario */}
         <div className="p-3 border-t border-[#20b2aa] text-xs text-white">
           {isCollapsed ? (
-            <p className="text-center uppercase">{user?.rol}</p>
+            <p className="text-center uppercase">{user ? ROLE_LABELS[user.role] : ""}</p>
           ) : (
             <p>
-              Conectado como <span className="font-semibold uppercase">{user?.rol}</span>
+              Conectado como <span className="font-semibold uppercase">{user ? ROLE_LABELS[user.role] : ""}</span>
             </p>
           )}
         </div>
