@@ -1,16 +1,17 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import type { Producto } from '../data/productos';
+import type { Product } from '../data/products';
 import { useAuth } from './AuthContext';
 
 // 1. Elemento del carrito: un producto + la cantidad seleccionada
-export interface CartItem extends Producto {
-  cantidad: number;
+export interface CartItem extends Product {
+  quantity: number;
 }
 
 interface CartContextType {
   cart: CartItem[];
-  addToCart: (producto: Producto) => void;
+  addToCart: (product: Product) => boolean;
   removeFromCart: (id: number) => void;
+  getQuantityInCart: (id: number) => number;
   incrementQuantity: (id: number) => void;
   decrementQuantity: (id: number) => void;
   clearCart: () => void;
@@ -20,7 +21,8 @@ interface CartContextType {
 
 // 2. Prefijo de la clave de persistencia en localStorage.
 // Se completa con el correo del usuario para que CADA CUENTA tenga su propio carrito.
-const CART_STORAGE_PREFIX = "multicatalogo_carrito_";
+// (Clave nueva: los carritos guardados con el formato anterior en español se descartan.)
+const CART_STORAGE_PREFIX = "multicatalogo_cart_";
 
 // 3. Creamos el contexto indicando que puede ser CartContextType o undefined
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -48,13 +50,15 @@ export const CartProvider = ({ children }: CartProviderProps) => {
   // por lo que el estado siempre se inicializa con el carrito de ESTE usuario.
   const storageKey = user
     ? `${CART_STORAGE_PREFIX}${user.email}`
-    : `${CART_STORAGE_PREFIX}anonimo`;
+    : `${CART_STORAGE_PREFIX}anonymous`;
 
   // Inicializamos el estado leyendo el carrito guardado del usuario actual
   const [cart, setCart] = useState<CartItem[]>(() => {
     try {
       const saved = localStorage.getItem(storageKey);
-      return saved ? (JSON.parse(saved) as CartItem[]) : [];
+      const items = saved ? (JSON.parse(saved) as CartItem[]) : [];
+      // Se descartan ítems guardados antes de que el producto incluyera stock
+      return items.filter((item) => typeof item.stock === "number");
     } catch {
       return [];
     }
@@ -65,18 +69,27 @@ export const CartProvider = ({ children }: CartProviderProps) => {
     localStorage.setItem(storageKey, JSON.stringify(cart));
   }, [cart, storageKey]);
 
-  const addToCart = (producto: Producto) => {
+  // Unidades de un producto que ya están en el carrito
+  const getQuantityInCart = (id: number) =>
+    cart.find((item) => item.id === id)?.quantity ?? 0;
+
+  // Agrega una unidad si hay stock disponible. Devuelve false si se alcanzó el stock.
+  // Es solo un aviso temprano: la base de datos vuelve a validar al confirmar el pedido.
+  const addToCart = (product: Product): boolean => {
+    if (getQuantityInCart(product.id) >= product.stock) return false;
+
     setCart((prevCart) => {
-      const itemExists = prevCart.find((item) => item.id === producto.id);
+      const itemExists = prevCart.find((item) => item.id === product.id);
       if (itemExists) {
         return prevCart.map((item) =>
-          item.id === producto.id
-            ? { ...item, cantidad: item.cantidad + 1 }
+          item.id === product.id
+            ? { ...item, stock: product.stock, quantity: Math.min(item.quantity + 1, product.stock) }
             : item
         );
       }
-      return [...prevCart, { ...producto, cantidad: 1 }];
+      return [...prevCart, { ...product, quantity: 1 }];
     });
+    return true;
   };
 
   const removeFromCart = (id: number) => {
@@ -86,7 +99,10 @@ export const CartProvider = ({ children }: CartProviderProps) => {
   const incrementQuantity = (id: number) => {
     setCart((prevCart) =>
       prevCart.map((item) =>
-        item.id === id ? { ...item, cantidad: item.cantidad + 1 } : item
+        // No se supera el stock conocido del producto
+        item.id === id && item.quantity < item.stock
+          ? { ...item, quantity: item.quantity + 1 }
+          : item
       )
     );
   };
@@ -95,9 +111,9 @@ export const CartProvider = ({ children }: CartProviderProps) => {
     setCart((prevCart) =>
       prevCart
         .map((item) =>
-          item.id === id ? { ...item, cantidad: item.cantidad - 1 } : item
+          item.id === id ? { ...item, quantity: item.quantity - 1 } : item
         )
-        .filter((item) => item.cantidad > 0) // si llega a 0, se elimina
+        .filter((item) => item.quantity > 0) // si llega a 0, se elimina
     );
   };
 
@@ -106,8 +122,8 @@ export const CartProvider = ({ children }: CartProviderProps) => {
     setCart([]);
   };
 
-  const totalItems = cart.reduce((total, item) => total + item.cantidad, 0);
-  const totalPrice = cart.reduce((total, item) => total + item.precio * item.cantidad, 0);
+  const totalItems = cart.reduce((total, item) => total + item.quantity, 0);
+  const totalPrice = cart.reduce((total, item) => total + item.price * item.quantity, 0);
 
   return (
     <CartContext.Provider
@@ -115,6 +131,7 @@ export const CartProvider = ({ children }: CartProviderProps) => {
         cart,
         addToCart,
         removeFromCart,
+        getQuantityInCart,
         incrementQuantity,
         decrementQuantity,
         clearCart,

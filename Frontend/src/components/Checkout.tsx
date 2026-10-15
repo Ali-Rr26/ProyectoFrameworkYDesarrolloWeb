@@ -1,69 +1,103 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
-import { METODOS_PAGO } from '../data/constants';
+import { createOrder, getPaymentMethods } from '../services/orderService';
+import { ApiError } from '../services/apiClient';
+import type { ConfirmedOrder } from './Confirmation';
 
-interface DatosEnvio {
-  nombre: string;
+interface ShippingData {
+  name: string;
   email: string;
-  direccion: string;
-  ciudad: string;
-  telefono: string;
-  metodoPago: string;
+  address: string;
+  city: string;
+  phone: string;
+  paymentMethod: string;
 }
 
 const Checkout = () => {
   const { cart, totalPrice, clearCart } = useCart();
   const navigate = useNavigate();
 
-  const [datos, setDatos] = useState<DatosEnvio>({
-    nombre: "",
+  const [shipping, setShipping] = useState<ShippingData>({
+    name: "",
     email: "",
-    direccion: "",
-    ciudad: "",
-    telefono: "",
-    metodoPago: METODOS_PAGO[0],
+    address: "",
+    city: "",
+    phone: "",
+    paymentMethod: "",
   });
-  const [procesando, setProcesando] = useState<boolean>(false);
+  const [paymentMethods, setPaymentMethods] = useState<string[]>([]);
+  const [processing, setProcessing] = useState<boolean>(false);
+  const [error, setError] = useState<string>("");
+
+  // Métodos de pago desde la BD (tabla payment_methods); se preselecciona el primero
+  useEffect(() => {
+    getPaymentMethods()
+      .then((methods) => {
+        setPaymentMethods(methods);
+        setShipping((prev) => (prev.paymentMethod ? prev : { ...prev, paymentMethod: methods[0] ?? "" }));
+      })
+      .catch(() => setError("No se pudieron cargar los métodos de pago"));
+  }, []);
 
   // Si el carrito está vacío, mostramos un aviso en lugar del formulario
   if (cart.length === 0) {
     return (
       <div className="bg-white p-10 rounded-lg border border-slate-200 text-center">
         <p className="text-slate-600 text-lg mb-4">No tienes productos en el carrito.</p>
-        <Link to="/catalogo" className="text-indigo-600 font-semibold hover:underline">
+        <Link to="/catalog" className="text-indigo-600 font-semibold hover:underline">
           ← Ir al catálogo
         </Link>
       </div>
     );
   }
 
-  const handleChange = (campo: keyof DatosEnvio, valor: string) => {
-    setDatos((prev) => ({ ...prev, [campo]: valor }));
+  const handleChange = (field: keyof ShippingData, value: string) => {
+    setShipping((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setProcesando(true);
+    setProcessing(true);
+    setError("");
 
-    // Simulamos el procesamiento del pago con un pequeño retraso
-    setTimeout(() => {
-      const pedido = {
-        numero: `MC-${Date.now().toString().slice(-6)}`,
-        items: cart.map((item) => ({
-          nombre: item.nombre,
-          cantidad: item.cantidad,
-          precio: item.precio,
+    try {
+      // El backend registra el pedido en una transacción: descuenta stock y usa
+      // los precios de la BD. El comprador se toma del JWT, no del formulario.
+      const created = await createOrder({
+        payment_method: shipping.paymentMethod,
+        shipping_address: shipping.address,
+        city: shipping.city,
+        phone: shipping.phone,
+        items: cart.map((item) => ({ product_id: item.id, quantity: item.quantity })),
+      });
+
+      // Los datos de la confirmación salen de la respuesta del servidor (no del carrito local)
+      const order: ConfirmedOrder = {
+        number: `MC-${created.id.toString().padStart(6, "0")}`,
+        items: created.items.map((item) => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.unit_price,
         })),
-        total: totalPrice,
-        cliente: { nombre: datos.nombre, email: datos.email, ciudad: datos.ciudad },
-        fecha: new Date().toLocaleString("es-EC"),
+        total: created.total,
+        customer: { name: shipping.name, email: shipping.email, city: shipping.city },
+        date: new Date(created.created_at).toLocaleString("es-EC"),
       };
 
       // Vaciamos el carrito y pasamos los datos del pedido a la confirmación
       clearCart();
-      navigate("/confirmacion", { state: { pedido } });
-    }, 1200);
+      navigate("/confirmation", { state: { order } });
+    } catch (err) {
+      // p. ej. "Stock insuficiente" (409) o "Referencia inválida" (422) con su detalle
+      if (err instanceof ApiError) {
+        const detail = typeof err.details === "string" ? ` (${err.details})` : "";
+        setError(`${err.message}${detail}`);
+      } else {
+        setError("No se pudo conectar con el servidor");
+      }
+      setProcessing(false);
+    }
   };
 
   return (
@@ -84,8 +118,8 @@ const Checkout = () => {
                 <input
                   type="text"
                   required
-                  value={datos.nombre}
-                  onChange={(e) => handleChange("nombre", e.target.value)}
+                  value={shipping.name}
+                  onChange={(e) => handleChange("name", e.target.value)}
                   className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-[#20b2aa] outline-none transition"
                 />
               </div>
@@ -96,7 +130,7 @@ const Checkout = () => {
                 <input
                   type="email"
                   required
-                  value={datos.email}
+                  value={shipping.email}
                   onChange={(e) => handleChange("email", e.target.value)}
                   className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-[#20b2aa] outline-none transition"
                 />
@@ -108,8 +142,8 @@ const Checkout = () => {
                 <input
                   type="text"
                   required
-                  value={datos.direccion}
-                  onChange={(e) => handleChange("direccion", e.target.value)}
+                  value={shipping.address}
+                  onChange={(e) => handleChange("address", e.target.value)}
                   className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-[#20b2aa] outline-none transition"
                 />
               </div>
@@ -120,8 +154,8 @@ const Checkout = () => {
                 <input
                   type="text"
                   required
-                  value={datos.ciudad}
-                  onChange={(e) => handleChange("ciudad", e.target.value)}
+                  value={shipping.city}
+                  onChange={(e) => handleChange("city", e.target.value)}
                   className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-[#20b2aa] outline-none transition"
                 />
               </div>
@@ -132,8 +166,8 @@ const Checkout = () => {
                 <input
                   type="tel"
                   required
-                  value={datos.telefono}
-                  onChange={(e) => handleChange("telefono", e.target.value)}
+                  value={shipping.phone}
+                  onChange={(e) => handleChange("phone", e.target.value)}
                   className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-[#20b2aa] outline-none transition"
                 />
               </div>
@@ -143,31 +177,37 @@ const Checkout = () => {
           <div className="bg-white p-6 rounded-lg border border-slate-200 shadow-sm">
             <h2 className="text-lg font-bold text-slate-800 mb-4">Método de Pago</h2>
             <div className="space-y-3">
-              {METODOS_PAGO.map((metodo) => (
+              {paymentMethods.map((method) => (
                 <label
-                  key={metodo}
+                  key={method}
                   className="flex items-center gap-3 p-3 rounded-lg border border-slate-200 cursor-pointer hover:border-indigo-300 transition"
                 >
                   <input
                     type="radio"
-                    name="metodoPago"
-                    value={metodo}
-                    checked={datos.metodoPago === metodo}
-                    onChange={(e) => handleChange("metodoPago", e.target.value)}
+                    name="paymentMethod"
+                    value={method}
+                    checked={shipping.paymentMethod === method}
+                    onChange={(e) => handleChange("paymentMethod", e.target.value)}
                     className="accent-[#20b2aa]"
                   />
-                  <span className="text-sm text-slate-700">{metodo}</span>
+                  <span className="text-sm text-slate-700">{method}</span>
                 </label>
               ))}
             </div>
           </div>
 
+          {error && (
+            <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm text-center border border-red-200">
+              {error}
+            </div>
+          )}
+
           <button
             type="submit"
-            disabled={procesando}
+            disabled={processing || !shipping.paymentMethod}
             className="w-full bg-[#20b2aa] text-white py-3 rounded-lg font-semibold hover:bg-[#008080] transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {procesando ? "Procesando pago..." : "Confirmar Pedido"}
+            {processing ? "Procesando pago..." : "Confirmar Pedido"}
           </button>
         </form>
 
@@ -178,10 +218,10 @@ const Checkout = () => {
             {cart.map((item) => (
               <div key={item.id} className="flex justify-between text-sm">
                 <span className="text-slate-600">
-                  {item.nombre} × {item.cantidad}
+                  {item.name} × {item.quantity}
                 </span>
                 <span className="font-semibold text-slate-800">
-                  ${(item.precio * item.cantidad).toFixed(2)}
+                  ${(item.price * item.quantity).toFixed(2)}
                 </span>
               </div>
             ))}

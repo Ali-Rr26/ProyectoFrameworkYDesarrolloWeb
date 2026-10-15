@@ -2,91 +2,82 @@
 package main
 
 import (
+	"log"
+	"os"
+	"os/signal"
+	"syscall"
+
 	// Importamos el framework principal Fiber.
 	"github.com/gofiber/fiber/v2"
 	// Importamos el middleware CORS para gestionar la seguridad entre distintos puertos/dominios.
 	"github.com/gofiber/fiber/v2/middleware/cors"
+
+	"multicatalogo-backend/auth"
+	"multicatalogo-backend/config"
+	"multicatalogo-backend/controllers"
+	"multicatalogo-backend/database"
+	"multicatalogo-backend/repository"
 	// Importamos nuestro propio paquete de rutas para delegarle la configuración de los endpoints.
 	"multicatalogo-backend/routes"
 )
 
 // func main es el punto de entrada de la aplicación en Go. Todo comienza a ejecutarse aquí.
 func main() {
+	// 1. Configuración desde variables de entorno (.env en desarrollo).
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// 2. Pool de conexiones a PostgreSQL (falla al arrancar si la BD no responde).
+	db, err := database.InitDB(cfg.DatabaseURL)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	// 3. Migraciones versionadas antes de aceptar peticiones.
+	if err := database.RunMigrations(db); err != nil {
+		log.Fatal(err)
+	}
+
+	// 4. Gestor de tokens JWT (falla si el secreto es demasiado corto).
+	jwtManager, err := auth.NewManager(cfg.JWTSecret, cfg.JWTTTL)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// 5. Inyección de dependencias: db -> repositorio -> handler -> rutas.
+	repo := repository.NewRepository(db)
+	handler := controllers.NewHandler(repo, cfg, jwtManager)
+
 	// Instanciamos una nueva aplicación de Fiber y la guardamos en la variable 'app'.
 	app := fiber.New()
 
 	// Implementamos el middleware CORS a nivel global usando app.Use() para interceptar todas las peticiones entrantes.
 	app.Use(cors.New(cors.Config{
-		// Configuramos el CORS para permitir únicamente peticiones provenientes del frontend local en el puerto 5173.
-		AllowOrigins: "http://localhost:5173",
+		// Permitimos únicamente peticiones provenientes del frontend configurado.
+		AllowOrigins: cfg.CORSOrigin,
 		// Declaramos de forma explícita qué cabeceras (Headers) se permitirán en la comunicación.
-		AllowHeaders: "Origin, Content-Type, Accept",
+		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
 	}))
 
-	// Llamamos a la función SetupRoutes de nuestro paquete 'routes', enviándole la instancia de nuestra 'app'.
-	routes.SetupRoutes(app)
+	routes.SetupRoutes(app, handler)
 
-	// Ponemos a la aplicación a escuchar peticiones en el puerto 4000 de la máquina local. (Bloquea el hilo de ejecución).
-	app.Listen(":4000")
+	// 6. Cierre ordenado: ante Ctrl+C se dejan de aceptar peticiones y luego se cierra el pool.
+	go func() {
+		quit := make(chan os.Signal, 1)
+		signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+		<-quit
+		log.Println("apagando servidor...")
+		if err := app.Shutdown(); err != nil {
+			log.Printf("error al apagar: %v", err)
+		}
+	}()
+
+	// Ponemos a la aplicación a escuchar peticiones (bloquea hasta Shutdown).
+	if err := app.Listen(":" + cfg.Port); err != nil {
+		log.Printf("servidor detenido: %v", err)
+	}
+	log.Println("cerrando conexiones a PostgreSQL")
 }
-
-
-
-
-
-// // main.go
-// package main
-
-// import (
-// 	"github.com/gofiber/fiber/v2"
-// 	"github.com/gofiber/fiber/v2/middleware/cors"
-// )
-
-// // Estructuras de datos
-// type LoginRequest struct {
-// 	Email    string `json:"email"`
-// 	Password string `json:"password"`
-// }
-
-// type Producto struct {
-// 	ID     int     `json:"id"`
-// 	Nombre string  `json:"nombre"`
-// 	Precio float64 `json:"precio"`
-// 	Img    string  `json:"img"`
-// }
-
-// func main() {
-// 	app := fiber.New()
-
-// 	// Middleware CORS para permitir peticiones desde React (Vite corre en el puerto 5173)
-// 	app.Use(cors.New(cors.Config{
-// 		AllowOrigins: "http://localhost:5173",
-// 		AllowHeaders: "Origin, Content-Type, Accept",
-// 	}))
-
-// 	// Endpoint para Login
-// 	app.Post("/api/login", func(c *fiber.Ctx) error {
-// 		var req LoginRequest
-// 		if err := c.BodyParser(&req); err != nil {
-// 			return c.Status(400).JSON(fiber.Map{"error": "Cuerpo de petición inválido"})
-// 		}
-
-// 		if req.Email == "admin@upse.edu.ec" && req.Password == "123456" {
-// 			return c.JSON(fiber.Map{"token": "fake-jwt-token-123", "email": req.Email})
-// 		}
-// 		return c.Status(401).JSON(fiber.Map{"error": "Credenciales incorrectas"})
-// 	})
-
-// 	// Endpoint para obtener Productos
-// 	app.Get("/api/productos", func(c *fiber.Ctx) error {
-// 		productos := []Producto{
-// 			{ID: 1, Nombre: "Serum Revitalizante", Precio: 45.00, Img: "https://picsum.photos/seed/serum/150"},
-// 			{ID: 2, Nombre: "Crema Hidratante Pro", Precio: 32.50, Img: "https://picsum.photos/seed/crema/150"},
-// 			{ID: 3, Nombre: "Tónico Purificante", Precio: 28.00, Img: "https://picsum.photos/seed/tonico/150"},
-// 			{ID: 4, Nombre: "Mascarilla Nocturna", Precio: 50.00, Img: "https://picsum.photos/seed/mascarilla/150"},
-// 		}
-// 		return c.JSON(productos)
-// 	})
-
-// 	app.Listen(":3000")
-// }

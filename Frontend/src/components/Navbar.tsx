@@ -4,6 +4,7 @@ import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
 import { Menu, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { ICON_SIZES } from '../constants/ui';
+import { ROLE_LABELS } from '../data/constants';
 
 interface NavbarProps {
   onMenuClick: () => void;
@@ -60,12 +61,12 @@ const Navbar = ({ onMenuClick, onToggleCollapse, isCollapsed }: NavbarProps) => 
         </button>
 
         <h2 className="text-slate-600 font-medium text-sm sm:text-lg hidden sm:block">
-          {user?.rol === "admin" ? "Panel de Administración" : "Tienda MultiCatálogo"}
+          {user?.role === "admin" ? "Panel de Administración" : "Tienda MultiCatálogo"}
         </h2>
       </div>
       <div className="flex items-center gap-2 sm:gap-6">
         <Link
-          to="/carrito"
+          to="/cart"
           className="relative p-2 hover:bg-slate-100 rounded-full transition"
           title="Carrito"
         >
@@ -84,12 +85,12 @@ const Navbar = ({ onMenuClick, onToggleCollapse, isCollapsed }: NavbarProps) => 
 
           <span
             className={`hidden md:inline-block text-xs font-semibold px-2 py-1 rounded-full uppercase ${
-              user?.rol === "admin"
+              user?.role === "admin"
                 ? "bg-[#40d9d8] text-white"
                 : "bg-sky-100 text-sky-700"
             }`}
           >
-            {user?.rol}
+            {user ? ROLE_LABELS[user.role] : ""}
           </span>
 
           <div className="relative group cursor-pointer pb-2" ref={dropdownRef}>
