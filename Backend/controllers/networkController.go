@@ -1,48 +1,50 @@
 package controllers
 
 import (
+	"strconv"
+
 	"github.com/gofiber/fiber/v2"
-	"multicatalogo-backend/models"
 )
 
-// GetNetwork devuelve la estructura completa de la red de referidos multinivel
-func GetNetwork(c *fiber.Ctx) error {
-	redInicial := models.Referido{
-		ID:     0,
-		Nombre: "Tú",
-		Nivel:  0,
-		Ventas: 2400,
-		Hijos: []models.Referido{
-			{
-				ID:     1,
-				Nombre: "Ana García",
-				Nivel:  1,
-				Ventas: 1200,
-				Hijos: []models.Referido{
-					{
-						ID:     4,
-						Nombre: "Carlos Ruiz",
-						Nivel:  2,
-						Ventas: 500,
-						Hijos: []models.Referido{
-							{ID: 7, Nombre: "Diana Paz", Nivel: 3, Ventas: 300},
-						},
-					},
-					{ID: 5, Nombre: "Sofía León", Nivel: 2, Ventas: 430},
-				},
-			},
-			{
-				ID:     2,
-				Nombre: "Luis Poveda",
-				Nivel:  1,
-				Ventas: 850,
-				Hijos: []models.Referido{
-					{ID: 6, Nombre: "Marco Díaz", Nivel: 2, Ventas: 380},
-				},
-			},
-			{ID: 3, Nombre: "Marta Sánchez", Nivel: 1, Ventas: 430},
-		},
+// GetNetwork devuelve el árbol de referidos multinivel leído desde PostgreSQL (requiere JWT).
+// Raíz según el rol del token:
+//   - customer: siempre su propia red (se ignora ?user_id para que no consulte redes ajenas).
+//   - admin:    ?user_id=<id> si se envía; si no, el usuario configurado en NETWORK_ROOT_EMAIL.
+func (h *Handler) GetNetwork(c *fiber.Ctx) error {
+	ctx, cancel := dbCtx(c)
+	defer cancel()
+
+	claims := currentClaims(c)
+	var rootID int
+	if claims.Role != "admin" {
+		id, err := claims.UserID()
+		if err != nil {
+			return apiError(c, fiber.StatusUnauthorized, "Token inválido o expirado", nil)
+		}
+		rootID = id
+	} else if q := c.Query("user_id"); q != "" {
+		id, err := strconv.Atoi(q)
+		if err != nil {
+			return apiError(c, fiber.StatusBadRequest, "user_id inválido, debe ser un número", q)
+		}
+		rootID = id
+	} else {
+		user, err := h.repo.GetUserByEmail(ctx, h.cfg.NetworkRootEmail)
+		if err != nil {
+			return repoError(c, err)
+		}
+		rootID = user.ID
 	}
 
-	return c.JSON(redInicial)
+	tree, err := h.repo.GetNetwork(ctx, rootID)
+	if err != nil {
+		return repoError(c, err)
+	}
+
+	// "Tú" solo cuando la raíz es quien consulta; si un admin ve la red de otro
+	// miembro, se conserva el nombre real para que quede claro de quién es la red.
+	if requesterID, err := claims.UserID(); err == nil && requesterID == rootID {
+		tree.Name = "Tú"
+	}
+	return c.JSON(tree)
 }
