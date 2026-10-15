@@ -2,13 +2,13 @@ import { type ReactNode } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import Layout from './components/Layout';
 import Dashboard from './components/Dashboard';
-import Catalogo from './components/Catalogo';
+import Catalog from './components/Catalog';
 import Storefront from './components/Storefront';
-import DetalleProducto from './components/DetalleProducto';
-import MiRed from './components/MiRed';
-import Carrito from './components/Carrito';
+import ProductDetail from './components/ProductDetail';
+import MyNetwork from './components/MyNetwork';
+import Cart from './components/Cart';
 import Checkout from './components/Checkout';
-import Confirmacion from './components/Confirmacion';
+import Confirmation from './components/Confirmation';
 import Login from './components/Login';
 import { CartProvider } from './context/CartContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -35,8 +35,8 @@ const AdminRoute = () => {
   }
 
   // Si el usuario no es admin, lo enviamos a la tienda (su vista por defecto)
-  if (user?.rol !== 'admin') {
-    return <Navigate to="/tienda" replace />;
+  if (user?.role !== 'admin') {
+    return <Navigate to="/store" replace />;
   }
 
   return <Outlet />;
@@ -47,7 +47,7 @@ const AdminRoute = () => {
 const CartBoundary = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
   return (
-    <CartProvider key={user?.email ?? "anonimo"}>
+    <CartProvider key={user?.email ?? "anonymous"}>
       {children}
     </CartProvider>
   );
@@ -68,16 +68,16 @@ function App() {
                 {/* Solo administrador: Dashboard y Red multinivel */}
                 <Route element={<AdminRoute />}>
                   <Route index element={<Dashboard />} />
-                  <Route path="mi-red" element={<MiRed />} />
+                  <Route path="my-network" element={<MyNetwork />} />
                 </Route>
 
                 {/* Ambos roles: flujo de compra en línea */}
-                <Route path="tienda" element={<Storefront />} />
-                <Route path="catalogo" element={<Catalogo />} />
-                <Route path="producto/:id" element={<DetalleProducto />} />
-                <Route path="carrito" element={<Carrito />} />
+                <Route path="store" element={<Storefront />} />
+                <Route path="catalog" element={<Catalog />} />
+                <Route path="product/:id" element={<ProductDetail />} />
+                <Route path="cart" element={<Cart />} />
                 <Route path="checkout" element={<Checkout />} />
-                <Route path="confirmacion" element={<Confirmacion />} />
+                <Route path="confirmation" element={<Confirmation />} />
               </Route>
             </Route>
 
