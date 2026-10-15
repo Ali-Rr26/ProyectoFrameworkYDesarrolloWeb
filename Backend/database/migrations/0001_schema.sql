@@ -13,11 +13,11 @@
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 -- -----------------------------------------------------------------------------
--- Catálogo de roles de acceso (admin, cliente).
+-- Catálogo de roles de acceso (admin, customer).
 -- -----------------------------------------------------------------------------
 CREATE TABLE roles (
-    id     SMALLINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    nombre VARCHAR(30) NOT NULL UNIQUE
+    id   SMALLINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name VARCHAR(30) NOT NULL UNIQUE
 );
 
 -- -----------------------------------------------------------------------------
@@ -30,9 +30,9 @@ CREATE TABLE users (
     id            INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     email         VARCHAR(254) NOT NULL CHECK (btrim(email) <> ''),
     password_hash VARCHAR(72)  NOT NULL,               -- hash bcrypt ($2a$/$2b$)
-    nombre        VARCHAR(120) NOT NULL CHECK (btrim(nombre) <> ''),
+    name          VARCHAR(120) NOT NULL CHECK (btrim(name) <> ''),
     role_id       SMALLINT     NOT NULL REFERENCES roles (id) ON DELETE RESTRICT,
-    activo        BOOLEAN      NOT NULL DEFAULT TRUE,  -- borrado lógico
+    active        BOOLEAN      NOT NULL DEFAULT TRUE,  -- borrado lógico
     created_at    TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
 -- Índice único sobre lower(email): evita duplicados por mayúsculas y sirve
@@ -67,15 +67,15 @@ BEGIN
 
     -- Sube por los ancestros del nuevo patrocinador; si aparece NEW.user_id, hay ciclo.
     IF EXISTS (
-        WITH RECURSIVE ancestros AS (
+        WITH RECURSIVE ancestors AS (
             SELECT NEW.sponsor_id AS id
             UNION
             SELECT nm.sponsor_id
             FROM network_members nm
-            JOIN ancestros a ON nm.user_id = a.id
+            JOIN ancestors a ON nm.user_id = a.id
             WHERE nm.sponsor_id IS NOT NULL
         )
-        SELECT 1 FROM ancestros WHERE id = NEW.user_id
+        SELECT 1 FROM ancestors WHERE id = NEW.user_id
     ) THEN
         RAISE EXCEPTION 'Ciclo en la red: el miembro % es descendiente de %', NEW.sponsor_id, NEW.user_id
             USING ERRCODE = '23514';  -- check_violation
@@ -93,26 +93,26 @@ CREATE TRIGGER trg_network_no_cycle
 -- Catálogo de categorías de producto.
 -- -----------------------------------------------------------------------------
 CREATE TABLE categories (
-    id     SMALLINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    nombre VARCHAR(60) NOT NULL UNIQUE
+    id   SMALLINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name VARCHAR(60) NOT NULL UNIQUE
 );
 
 -- -----------------------------------------------------------------------------
--- Productos. precio en NUMERIC (exacto, sin errores de coma flotante).
--- img_url es la imagen principal; la galería va en product_images.
+-- Productos. price en NUMERIC (exacto, sin errores de coma flotante).
+-- image_url es la imagen principal; la galería va en product_images.
 -- -----------------------------------------------------------------------------
 CREATE TABLE products (
     id          INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    nombre      VARCHAR(120)  NOT NULL CHECK (btrim(nombre) <> ''),
-    descripcion TEXT          NOT NULL DEFAULT '',
-    precio      NUMERIC(10,2) NOT NULL CHECK (precio > 0),
+    name        VARCHAR(120)  NOT NULL CHECK (btrim(name) <> ''),
+    description TEXT          NOT NULL DEFAULT '',
+    price       NUMERIC(10,2) NOT NULL CHECK (price > 0),
     stock       INTEGER       NOT NULL DEFAULT 0 CHECK (stock >= 0),
     category_id SMALLINT      NOT NULL REFERENCES categories (id) ON DELETE RESTRICT,
-    img_url     VARCHAR(500)  NOT NULL,
+    image_url   VARCHAR(500)  NOT NULL,
     created_at  TIMESTAMPTZ   NOT NULL DEFAULT now()
 );
 -- Nombre único sin distinguir mayúsculas (permite responder 409 ante duplicados).
-CREATE UNIQUE INDEX ux_products_nombre ON products (lower(nombre));
+CREATE UNIQUE INDEX ux_products_name ON products (lower(name));
 CREATE INDEX ix_products_category ON products (category_id);
 
 -- -----------------------------------------------------------------------------
@@ -122,16 +122,16 @@ CREATE TABLE product_images (
     id         INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     product_id INTEGER      NOT NULL REFERENCES products (id) ON DELETE CASCADE,
     url        VARCHAR(500) NOT NULL,
-    orden      SMALLINT     NOT NULL CHECK (orden >= 0),
-    CONSTRAINT ux_product_images_orden UNIQUE (product_id, orden)
+    position   SMALLINT     NOT NULL CHECK (position >= 0),
+    CONSTRAINT ux_product_images_position UNIQUE (product_id, position)
 );
 
 -- -----------------------------------------------------------------------------
 -- Catálogo de métodos de pago.
 -- -----------------------------------------------------------------------------
 CREATE TABLE payment_methods (
-    id     SMALLINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    nombre VARCHAR(60) NOT NULL UNIQUE
+    id   SMALLINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name VARCHAR(60) NOT NULL UNIQUE
 );
 
 -- -----------------------------------------------------------------------------
@@ -141,22 +141,22 @@ CREATE TABLE orders (
     id                INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     user_id           INTEGER      NOT NULL REFERENCES users (id) ON DELETE RESTRICT,
     payment_method_id SMALLINT     NOT NULL REFERENCES payment_methods (id) ON DELETE RESTRICT,
-    direccion_envio   VARCHAR(200) NOT NULL,
-    ciudad            VARCHAR(80)  NOT NULL,
-    telefono          VARCHAR(20)  NOT NULL,
-    fecha             TIMESTAMPTZ  NOT NULL DEFAULT now()
+    shipping_address  VARCHAR(200) NOT NULL,
+    city              VARCHAR(80)  NOT NULL,
+    phone             VARCHAR(20)  NOT NULL,
+    created_at        TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
 CREATE INDEX ix_orders_user ON orders (user_id);
 
 -- -----------------------------------------------------------------------------
--- Detalle de pedido. precio_unitario es el precio AL MOMENTO de la venta
--- (hecho distinto de products.precio, no es redundancia).
+-- Detalle de pedido. unit_price es el precio AL MOMENTO de la venta
+-- (hecho distinto de products.price, no es redundancia).
 -- -----------------------------------------------------------------------------
 CREATE TABLE order_items (
-    order_id        INTEGER       NOT NULL REFERENCES orders (id) ON DELETE CASCADE,
-    product_id      INTEGER       NOT NULL REFERENCES products (id) ON DELETE RESTRICT,
-    cantidad        INTEGER       NOT NULL CHECK (cantidad > 0),
-    precio_unitario NUMERIC(10,2) NOT NULL CHECK (precio_unitario >= 0),
+    order_id   INTEGER       NOT NULL REFERENCES orders (id) ON DELETE CASCADE,
+    product_id INTEGER       NOT NULL REFERENCES products (id) ON DELETE RESTRICT,
+    quantity   INTEGER       NOT NULL CHECK (quantity > 0),
+    unit_price NUMERIC(10,2) NOT NULL CHECK (unit_price >= 0),
     PRIMARY KEY (order_id, product_id)
 );
 CREATE INDEX ix_order_items_product ON order_items (product_id);
@@ -167,12 +167,12 @@ CREATE INDEX ix_order_items_product ON order_items (product_id);
 CREATE VIEW v_order_totals AS
 SELECT o.id AS order_id,
        o.user_id,
-       SUM(oi.cantidad * oi.precio_unitario) AS total
+       SUM(oi.quantity * oi.unit_price) AS total
 FROM orders o
 JOIN order_items oi ON oi.order_id = o.id
 GROUP BY o.id, o.user_id;
 
 CREATE VIEW v_user_sales AS
-SELECT user_id, SUM(total) AS ventas
+SELECT user_id, SUM(total) AS sales
 FROM v_order_totals
 GROUP BY user_id;

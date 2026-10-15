@@ -1,22 +1,24 @@
 -- =============================================================================
 -- Migración 0002: Datos semilla.
 -- Reproduce exactamente los datos que antes estaban escritos en los
--- controladores, para que el frontend reciba el mismo JSON.
+-- controladores, para que el frontend muestre la misma información.
+-- Los valores (nombres, descripciones, categorías) quedan en español porque
+-- son contenido que ve el usuario; los identificadores del esquema, en inglés.
 -- Contraseña de todos los usuarios demo: 123456 (hash bcrypt vía pgcrypto,
 -- compatible con golang.org/x/crypto/bcrypt).
 -- =============================================================================
 
 -- Catálogos ------------------------------------------------------------------
-INSERT INTO roles (nombre) VALUES ('admin'), ('cliente');
+INSERT INTO roles (name) VALUES ('admin'), ('customer');
 
-INSERT INTO categories (nombre) VALUES ('Serum'), ('Crema'), ('Tónico'), ('Mascarilla'), ('Kit');
+INSERT INTO categories (name) VALUES ('Serum'), ('Crema'), ('Tónico'), ('Mascarilla'), ('Kit');
 
-INSERT INTO payment_methods (nombre)
+INSERT INTO payment_methods (name)
 VALUES ('Tarjeta de crédito'), ('Transferencia bancaria'), ('Efectivo contra entrega');
 
--- Productos (se insertan en orden para que reciban los IDs 1..8) ----------------
-INSERT INTO products (nombre, descripcion, precio, stock, category_id, img_url)
-SELECT p.nombre, p.descripcion, p.precio, 100, c.id, p.img_url
+-- Productos (ORDER BY pos: reciben los IDs 1..8 en una base nueva) -------------
+INSERT INTO products (name, description, price, stock, category_id, image_url)
+SELECT p.name, p.description, p.price, 100, c.id, p.image_url
 FROM (VALUES
     (1, 'Serum Revitalizante', 'Serum concentrado con vitamina C y ácido hialurónico. Ilumina la piel, reduce manchas y aporta hidratación profunda desde la primera aplicación.', 'Serum', 45.00, 'https://picsum.photos/seed/serum/600'),
     (2, 'Crema Hidratante Pro', 'Crema facial de textura ligera con niacinamida y manteca de karité. Hidratación de 24 horas y barrera cutánea fortalecida para todo tipo de piel.', 'Crema', 32.50, 'https://picsum.photos/seed/crema/600'),
@@ -26,12 +28,12 @@ FROM (VALUES
     (6, 'Crema Contorno de Ojos', 'Contorno de ojos con cafeína y péptidos. Reduce bolsas y ojeras, hidrata la zona más delicada del rostro.', 'Crema', 26.00, 'https://picsum.photos/seed/ojos/600'),
     (7, 'Tónico Exfoliante AHA-BHA', 'Exfoliación química suave con ácidos AHA y BHA. Renueva la textura de la piel y desobstruye los poros.', 'Tónico', 34.00, 'https://picsum.photos/seed/exfoliante/600'),
     (8, 'Kit Rutina Completa', 'Kit integral con serum, crema, tónico y mascarilla. La rutina perfecta para comenzar: limpieza, tratamiento e hidratación.', 'Kit', 129.00, 'https://picsum.photos/seed/kit/600')
-) AS p (pos, nombre, descripcion, categoria, precio, img_url)
-JOIN categories c ON c.nombre = p.categoria
+) AS p (pos, name, description, category, price, image_url)
+JOIN categories c ON c.name = p.category
 ORDER BY p.pos;
 
 -- Galería: 3 imágenes por producto, <seed>1..3 -------------------------------
-INSERT INTO product_images (product_id, url, orden)
+INSERT INTO product_images (product_id, url, position)
 SELECT pr.id, 'https://picsum.photos/seed/' || s.seed || n.i || '/600', n.i - 1
 FROM (VALUES
     ('Serum Revitalizante', 'serum'),
@@ -42,31 +44,31 @@ FROM (VALUES
     ('Crema Contorno de Ojos', 'ojos'),
     ('Tónico Exfoliante AHA-BHA', 'exfoliante'),
     ('Kit Rutina Completa', 'kit')
-) AS s (producto, seed)
-JOIN products pr ON pr.nombre = s.producto
+) AS s (product, seed)
+JOIN products pr ON pr.name = s.product
 CROSS JOIN generate_series(1, 3) AS n (i);
 
 -- Usuarios (ORDER BY pos: IDs deterministas 1..9 en una base nueva) ----------
-INSERT INTO users (email, password_hash, nombre, role_id)
-SELECT u.email, crypt('123456', gen_salt('bf', 10)), u.nombre, r.id
+INSERT INTO users (email, password_hash, name, role_id)
+SELECT u.email, crypt('123456', gen_salt('bf', 10)), u.name, r.id
 FROM (VALUES
     (1, 'admin@upse.edu.ec',               'Administrador', 'admin'),
-    (2, 'cliente@upse.edu.ec',             'Cliente Demo',  'cliente'),
-    (3, 'ana.garcia@multicatalogo.ec',     'Ana García',    'cliente'),
-    (4, 'luis.poveda@multicatalogo.ec',    'Luis Poveda',   'cliente'),
-    (5, 'marta.sanchez@multicatalogo.ec',  'Marta Sánchez', 'cliente'),
-    (6, 'carlos.ruiz@multicatalogo.ec',    'Carlos Ruiz',   'cliente'),
-    (7, 'sofia.leon@multicatalogo.ec',     'Sofía León',    'cliente'),
-    (8, 'marco.diaz@multicatalogo.ec',     'Marco Díaz',    'cliente'),
-    (9, 'diana.paz@multicatalogo.ec',      'Diana Paz',     'cliente')
-) AS u (pos, email, nombre, rol)
-JOIN roles r ON r.nombre = u.rol
+    (2, 'cliente@upse.edu.ec',             'Cliente Demo',  'customer'),
+    (3, 'ana.garcia@multicatalogo.ec',     'Ana García',    'customer'),
+    (4, 'luis.poveda@multicatalogo.ec',    'Luis Poveda',   'customer'),
+    (5, 'marta.sanchez@multicatalogo.ec',  'Marta Sánchez', 'customer'),
+    (6, 'carlos.ruiz@multicatalogo.ec',    'Carlos Ruiz',   'customer'),
+    (7, 'sofia.leon@multicatalogo.ec',     'Sofía León',    'customer'),
+    (8, 'marco.diaz@multicatalogo.ec',     'Marco Díaz',    'customer'),
+    (9, 'diana.paz@multicatalogo.ec',      'Diana Paz',     'customer')
+) AS u (pos, email, name, role)
+JOIN roles r ON r.name = u.role
 ORDER BY u.pos;
 
 -- Red multinivel (el admin no participa). Se inserta de padres a hijos
 -- para que la FK sponsor_id siempre encuentre al patrocinador.
 INSERT INTO network_members (user_id, sponsor_id)
-SELECT hijo.id, padre.id
+SELECT child.id, parent.id
 FROM (VALUES
     (1, 'cliente@upse.edu.ec',            NULL),
     (2, 'ana.garcia@multicatalogo.ec',    'cliente@upse.edu.ec'),
@@ -76,15 +78,15 @@ FROM (VALUES
     (3, 'sofia.leon@multicatalogo.ec',    'ana.garcia@multicatalogo.ec'),
     (3, 'marco.diaz@multicatalogo.ec',    'luis.poveda@multicatalogo.ec'),
     (4, 'diana.paz@multicatalogo.ec',     'carlos.ruiz@multicatalogo.ec')
-) AS m (orden, hijo_email, padre_email)
-JOIN users hijo ON hijo.email = m.hijo_email
-LEFT JOIN users padre ON padre.email = m.padre_email
-ORDER BY m.orden, hijo.id;
+) AS m (depth, child_email, parent_email)
+JOIN users child ON child.email = m.child_email
+LEFT JOIN users parent ON parent.email = m.parent_email
+ORDER BY m.depth, child.id;
 
 -- Pedidos históricos: sus totales reproducen las ventas que mostraba la red --
 --   Tú 2400 | Ana 1200 | Luis 850 | Marta 430 | Carlos 500 | Sofía 430 | Marco 380 | Diana 300
-CREATE TEMPORARY TABLE seed_ventas (email VARCHAR, producto VARCHAR, cantidad INT) ON COMMIT DROP;
-INSERT INTO seed_ventas VALUES
+CREATE TEMPORARY TABLE seed_sales (email VARCHAR, product VARCHAR, quantity INT) ON COMMIT DROP;
+INSERT INTO seed_sales VALUES
     ('cliente@upse.edu.ec',            'Mascarilla Nocturna',     48),
     ('ana.garcia@multicatalogo.ec',    'Mascarilla Nocturna',     24),
     ('luis.poveda@multicatalogo.ec',   'Mascarilla Nocturna',     17),
@@ -98,16 +100,16 @@ INSERT INTO seed_ventas VALUES
     ('diana.paz@multicatalogo.ec',     'Mascarilla Nocturna',      6);
 
 -- Un pedido por usuario.
-INSERT INTO orders (user_id, payment_method_id, direccion_envio, ciudad, telefono)
+INSERT INTO orders (user_id, payment_method_id, shipping_address, city, phone)
 SELECT u.id, pm.id, 'Av. Principal s/n', 'La Libertad', '0990000000'
-FROM (SELECT DISTINCT email FROM seed_ventas) sv
-JOIN users u ON u.email = sv.email
-JOIN payment_methods pm ON pm.nombre = 'Tarjeta de crédito';
+FROM (SELECT DISTINCT email FROM seed_sales) ss
+JOIN users u ON u.email = ss.email
+JOIN payment_methods pm ON pm.name = 'Tarjeta de crédito';
 
--- Detalle con el precio vigente como precio_unitario.
-INSERT INTO order_items (order_id, product_id, cantidad, precio_unitario)
-SELECT o.id, p.id, sv.cantidad, p.precio
-FROM seed_ventas sv
-JOIN users u    ON u.email = sv.email
+-- Detalle con el precio vigente como unit_price.
+INSERT INTO order_items (order_id, product_id, quantity, unit_price)
+SELECT o.id, p.id, ss.quantity, p.price
+FROM seed_sales ss
+JOIN users u    ON u.email = ss.email
 JOIN orders o   ON o.user_id = u.id
-JOIN products p ON p.nombre = sv.producto;
+JOIN products p ON p.name = ss.product;
