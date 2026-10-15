@@ -1,21 +1,21 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { getProductos } from '../services/productosService';
-import type { Producto } from '../data/productos';
+import { getProducts } from '../services/productService';
+import type { Product } from '../data/products';
 
 const Storefront = () => {
   const { user } = useAuth();
-  const [destacados, setDestacados] = useState<Producto[]>([]);
-  const [categorias, setCategorias] = useState<string[]>([]);
+  const [featured, setFeatured] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    getProductos()
+    getProducts()
       .then((data) => {
-        setDestacados(data.slice(0, 4));
-        const cats = data.map((prod) => prod.categoria);
-        setCategorias(Array.from(new Set(cats)).sort());
+        setFeatured(data.slice(0, 4));
+        const names = data.map((product) => product.category);
+        setCategories(Array.from(new Set(names)).sort());
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -45,16 +45,16 @@ const Storefront = () => {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
-              to="/catalogo"
+              to="/catalog"
               className="bg-white text-[#338b85] font-bold px-8 py-4 rounded-lg hover:bg-slate-100 transition shadow-lg"
             >
               Ver Catálogo Completo
             </Link>
             {/* La red multinivel (Mi Red) es exclusiva del administrador:
                 no se muestra a los clientes para evitar enlaces no funcionales */}
-            {user?.rol === "admin" && (
+            {user?.role === "admin" && (
               <Link
-                to="/mi-red"
+                to="/my-network"
                 className="border-2 border-white/60 text-white font-bold px-8 py-4 rounded-lg hover:bg-white/10 transition"
               >
                 Conocer el Plan Multinivel
@@ -77,13 +77,13 @@ const Storefront = () => {
           Explora por Categoría
         </h2>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          {categorias.map((cat) => (
+          {categories.map((category) => (
             <Link
-              key={cat}
-              to={`/catalogo?categoria=${encodeURIComponent(cat)}`}
+              key={category}
+              to={`/catalog?category=${encodeURIComponent(category)}`}
               className="bg-white border border-slate-200 rounded-xl p-6 text-center shadow-sm hover:shadow-md hover:border-[#5dc1b9] hover:-translate-y-1 transition-all"
             >
-              <p className="font-semibold text-slate-700">{cat}</p>
+              <p className="font-semibold text-slate-700">{category}</p>
             </Link>
           ))}
         </div>
@@ -100,23 +100,23 @@ const Storefront = () => {
             <p className="text-center text-slate-500">Cargando destacados...</p>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {destacados.map((prod) => (
+              {featured.map((product) => (
                 <Link
-                  key={prod.id}
-                  to={`/producto/${prod.id}`}
+                  key={product.id}
+                  to={`/product/${product.id}`}
                   className="bg-white rounded-xl overflow-hidden border border-slate-200 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all group"
                 >
                   <img
-                    src={prod.img}
-                    alt={prod.nombre}
+                    src={product.image}
+                    alt={product.name}
                     className="w-full h-48 object-cover group-hover:scale-105 transition-transform"
                   />
                   <div className="p-4">
                     <p className="text-xs uppercase tracking-wide text-[#40d9d8] font-semibold">
-                      {prod.categoria}
+                      {product.category}
                     </p>
-                    <h3 className="font-semibold text-slate-800 mt-1">{prod.nombre}</h3>
-                    <p className="text-[#20b2aa] font-bold mt-2">${prod.precio.toFixed(2)}</p>
+                    <h3 className="font-semibold text-slate-800 mt-1">{product.name}</h3>
+                    <p className="text-[#20b2aa] font-bold mt-2">${product.price.toFixed(2)}</p>
                   </div>
                 </Link>
               ))}
@@ -133,30 +133,30 @@ const Storefront = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {[
             {
-              paso: "1",
-              titulo: "Explora y compra",
-              texto: "Elige tus productos favoritos del catálogo y genera tu primera venta.",
+              step: "1",
+              title: "Explora y compra",
+              text: "Elige tus productos favoritos del catálogo y genera tu primera venta.",
             },
             {
-              paso: "2",
-              titulo: "Invita a tu red",
-              texto: "Comparte tu enlace de referido. Cada invitado suma un nivel en tu red.",
+              step: "2",
+              title: "Invita a tu red",
+              text: "Comparte tu enlace de referido. Cada invitado suma un nivel en tu red.",
             },
             {
-              paso: "3",
-              titulo: "Gana comisiones",
-              texto: "Recibe 10 %, 5 % y 2 % de las ventas de tus niveles 1, 2 y 3.",
+              step: "3",
+              title: "Gana comisiones",
+              text: "Recibe 10 %, 5 % y 2 % de las ventas de tus niveles 1, 2 y 3.",
             },
           ].map((item) => (
             <div
-              key={item.paso}
+              key={item.step}
               className="bg-white border border-slate-200 rounded-xl p-8 text-center shadow-sm"
             >
               <div className="w-12 h-12 mx-auto rounded-full bg-[#20b2aa] text-white font-bold text-xl flex items-center justify-center mb-4">
-                {item.paso}
+                {item.step}
               </div>
-              <h3 className="font-bold text-slate-800 mb-2">{item.titulo}</h3>
-              <p className="text-slate-500 text-sm">{item.texto}</p>
+              <h3 className="font-bold text-slate-800 mb-2">{item.title}</h3>
+              <p className="text-slate-500 text-sm">{item.text}</p>
             </div>
           ))}
         </div>
@@ -171,9 +171,9 @@ const Storefront = () => {
           Únete a MultiCatálogo y transforma tu red de contactos en un negocio
           de cosméticos premium.
         </p>
-        {/* El texto del botón debe reflejar su destino: ya estamos en /tienda */}
+        {/* El texto del botón debe reflejar su destino: ya estamos en /store */}
         <Link
-          to="/catalogo"
+          to="/catalog"
           className="inline-block bg-[#5dc1b9] text-white font-bold px-10 py-4 rounded-lg hover:bg-[#20b2aa] transition shadow-lg"
         >
           Explorar el Catálogo
