@@ -1,15 +1,15 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import type { Producto } from '../data/productos';
+import type { Product } from '../data/products';
 import { useAuth } from './AuthContext';
 
 // 1. Elemento del carrito: un producto + la cantidad seleccionada
-export interface CartItem extends Producto {
-  cantidad: number;
+export interface CartItem extends Product {
+  quantity: number;
 }
 
 interface CartContextType {
   cart: CartItem[];
-  addToCart: (producto: Producto) => void;
+  addToCart: (product: Product) => void;
   removeFromCart: (id: number) => void;
   incrementQuantity: (id: number) => void;
   decrementQuantity: (id: number) => void;
@@ -20,7 +20,8 @@ interface CartContextType {
 
 // 2. Prefijo de la clave de persistencia en localStorage.
 // Se completa con el correo del usuario para que CADA CUENTA tenga su propio carrito.
-const CART_STORAGE_PREFIX = "multicatalogo_carrito_";
+// (Clave nueva: los carritos guardados con el formato anterior en español se descartan.)
+const CART_STORAGE_PREFIX = "multicatalogo_cart_";
 
 // 3. Creamos el contexto indicando que puede ser CartContextType o undefined
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -48,7 +49,7 @@ export const CartProvider = ({ children }: CartProviderProps) => {
   // por lo que el estado siempre se inicializa con el carrito de ESTE usuario.
   const storageKey = user
     ? `${CART_STORAGE_PREFIX}${user.email}`
-    : `${CART_STORAGE_PREFIX}anonimo`;
+    : `${CART_STORAGE_PREFIX}anonymous`;
 
   // Inicializamos el estado leyendo el carrito guardado del usuario actual
   const [cart, setCart] = useState<CartItem[]>(() => {
@@ -65,17 +66,17 @@ export const CartProvider = ({ children }: CartProviderProps) => {
     localStorage.setItem(storageKey, JSON.stringify(cart));
   }, [cart, storageKey]);
 
-  const addToCart = (producto: Producto) => {
+  const addToCart = (product: Product) => {
     setCart((prevCart) => {
-      const itemExists = prevCart.find((item) => item.id === producto.id);
+      const itemExists = prevCart.find((item) => item.id === product.id);
       if (itemExists) {
         return prevCart.map((item) =>
-          item.id === producto.id
-            ? { ...item, cantidad: item.cantidad + 1 }
+          item.id === product.id
+            ? { ...item, quantity: item.quantity + 1 }
             : item
         );
       }
-      return [...prevCart, { ...producto, cantidad: 1 }];
+      return [...prevCart, { ...product, quantity: 1 }];
     });
   };
 
@@ -86,7 +87,7 @@ export const CartProvider = ({ children }: CartProviderProps) => {
   const incrementQuantity = (id: number) => {
     setCart((prevCart) =>
       prevCart.map((item) =>
-        item.id === id ? { ...item, cantidad: item.cantidad + 1 } : item
+        item.id === id ? { ...item, quantity: item.quantity + 1 } : item
       )
     );
   };
@@ -95,9 +96,9 @@ export const CartProvider = ({ children }: CartProviderProps) => {
     setCart((prevCart) =>
       prevCart
         .map((item) =>
-          item.id === id ? { ...item, cantidad: item.cantidad - 1 } : item
+          item.id === id ? { ...item, quantity: item.quantity - 1 } : item
         )
-        .filter((item) => item.cantidad > 0) // si llega a 0, se elimina
+        .filter((item) => item.quantity > 0) // si llega a 0, se elimina
     );
   };
 
@@ -106,8 +107,8 @@ export const CartProvider = ({ children }: CartProviderProps) => {
     setCart([]);
   };
 
-  const totalItems = cart.reduce((total, item) => total + item.cantidad, 0);
-  const totalPrice = cart.reduce((total, item) => total + item.precio * item.cantidad, 0);
+  const totalItems = cart.reduce((total, item) => total + item.quantity, 0);
+  const totalPrice = cart.reduce((total, item) => total + item.price * item.quantity, 0);
 
   return (
     <CartContext.Provider

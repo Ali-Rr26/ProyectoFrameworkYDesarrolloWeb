@@ -2,7 +2,15 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { API_URL } from '../data/constants';
+import { apiFetch, ApiError } from '../services/apiClient';
+
+// Respuesta de POST /api/login
+interface LoginResponse {
+  token: string;
+  email: string;
+  role: string;
+  expires_at: string;
+}
 
 const Login = () => {
   const [email, setEmail] = useState<string>('');
@@ -19,47 +27,27 @@ const Login = () => {
     setError('');
 
     try {
-      const response = await fetch(`${API_URL}/api/login`, {
+      // Ruta pública: auth=false (no envía token ni dispara el cierre de sesión ante un 401).
+      const data = await apiFetch<LoginResponse>('/api/login', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
+        body: { email, password },
+        auth: false,
       });
 
-      if (!response.ok) {
-        const data = await response.json();
-        setError(data.error || 'Credenciales incorrectas');
-        setLoading(false);
-        return;
-      }
-
-      const data = await response.json();
-      setError('');
-
-      // La API devuelve el rol (admin | cliente) junto al correo
-      const rol = data.rol === 'admin' ? 'admin' : 'cliente';
-      login({ email: data.email, rol });
+      // La API devuelve el JWT, el rol (admin | customer) y la expiración del token
+      const role = data.role === 'admin' ? 'admin' : 'customer';
+      login({ email: data.email, role }, data.token, data.expires_at);
 
       // Redirigimos según el rol: admin al Dashboard, cliente a la Tienda
-      navigate(rol === 'admin' ? '/' : '/tienda');
+      navigate(role === 'admin' ? '/' : '/store');
     } catch (err) {
-      setError('Error al conectar con el servidor');
+      // El backend responde { status, message }: mostramos su mensaje (p. ej. "Credenciales incorrectas").
+      setError(err instanceof ApiError ? err.message : 'Error al conectar con el servidor');
       console.error(err);
     } finally {
       setLoading(false);
     }
   };
-
-  /* Validación hardcodeada anterior (A futuro se reemplazará por llamada a API)
-  if (email === 'admin@upse.edu.ec' && password === '123456') {
-    setError('');
-    login(email); // Cambiamos el estado global a autenticado
-    navigate('/'); // Redirigimos al Dashboard
-  } else {
-    setError('Credenciales incorrectas. Usa admin@upse.edu.ec / 123456');
-  }
-  */
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-100 px-4">
