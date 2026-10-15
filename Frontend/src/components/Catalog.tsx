@@ -10,7 +10,7 @@ import type { Product } from '../data/products';
 const ALL_CATEGORIES = 'Todas';
 
 const Catalog = () => {
-  const { addToCart } = useCart();
+  const { addToCart, getQuantityInCart } = useCart();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>('');
@@ -120,7 +120,11 @@ const Catalog = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {filteredProducts.map((product) => (
+          {filteredProducts.map((product) => {
+            // Sin stock o con todas las unidades ya en el carrito no se puede agregar más
+            const soldOut = product.stock <= 0;
+            const limitReached = !soldOut && getQuantityInCart(product.id) >= product.stock;
+            return (
             <div
               key={product.id}
               className="bg-white rounded-lg overflow-hidden border border-slate-200 shadow-sm flex flex-col"
@@ -141,19 +145,24 @@ const Catalog = () => {
                     {product.name}
                   </h3>
                 </Link>
-                <p className="text-[#20b2aa] font-bold mt-2 mb-4">
+                <p className="text-[#20b2aa] font-bold mt-2">
                   ${product.price.toFixed(2)}
+                </p>
+                <p className={`text-xs mb-4 ${soldOut ? "text-red-600 font-semibold" : product.stock <= 5 ? "text-amber-600" : "text-slate-400"}`}>
+                  {soldOut ? "Agotado" : product.stock <= 5 ? `¡Quedan ${product.stock}!` : `${product.stock} disponibles`}
                 </p>
 
                 <button
                   onClick={() => addToCart(product)}
-                  className="mt-auto w-full bg-[#20b2aa] text-white py-2 rounded text-sm hover:bg-[#008080] transition"
+                  disabled={soldOut || limitReached}
+                  className="mt-auto w-full bg-[#20b2aa] text-white py-2 rounded text-sm hover:bg-[#008080] transition disabled:bg-slate-300 disabled:cursor-not-allowed"
                 >
-                  Añadir al Carrito
+                  {soldOut ? "Agotado" : limitReached ? "Máximo en el carrito" : "Añadir al Carrito"}
                 </button>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

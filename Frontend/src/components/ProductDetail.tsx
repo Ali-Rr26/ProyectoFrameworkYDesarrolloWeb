@@ -7,7 +7,7 @@ import { useCart } from '../context/CartContext';
 const ProductDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { addToCart } = useCart();
+  const { addToCart, getQuantityInCart } = useCart();
 
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -59,8 +59,12 @@ const ProductDetail = () => {
   // Todas las imágenes de la galería: principal + adicionales
   const images = [product.image, ...product.gallery];
 
+  // Sin stock o con todas las unidades ya en el carrito no se puede agregar más
+  const soldOut = product.stock <= 0;
+  const limitReached = !soldOut && getQuantityInCart(product.id) >= product.stock;
+
   const handleAddToCart = () => {
-    addToCart(product);
+    if (!addToCart(product)) return;
     setAdded(true);
     setTimeout(() => setAdded(false), 1500);
   };
@@ -110,19 +114,29 @@ const ProductDetail = () => {
             {product.category}
           </p>
           <h1 className="text-3xl font-bold text-slate-800 mt-1 mb-3">{product.name}</h1>
-          <p className="text-3xl font-bold text-[#20b2aa] mb-6">
+          <p className="text-3xl font-bold text-[#20b2aa] mb-2">
             ${product.price.toFixed(2)}
+          </p>
+          <p className={`text-sm mb-6 ${soldOut ? "text-red-600 font-semibold" : product.stock <= 5 ? "text-amber-600 font-semibold" : "text-slate-500"}`}>
+            {soldOut ? "Producto agotado" : product.stock <= 5 ? `¡Solo quedan ${product.stock} unidades!` : `${product.stock} unidades disponibles`}
           </p>
           <p className="text-slate-600 leading-relaxed mb-8">{product.description}</p>
 
           <button
             onClick={handleAddToCart}
-            className={`w-full md:w-auto px-10 py-4 rounded-lg font-bold transition shadow-md ${added
+            disabled={soldOut || limitReached}
+            className={`w-full md:w-auto px-10 py-4 rounded-lg font-bold transition shadow-md disabled:bg-slate-300 disabled:cursor-not-allowed ${added
                 ? "bg-green-600 text-white"
                 : "bg-[#20b2aa] text-white hover:bg-[#008080]"
               }`}
           >
-            {added ? "✓ Añadido al carrito" : "Añadir al Carrito"}
+            {soldOut
+              ? "Agotado"
+              : limitReached
+                ? "Ya tienes todas las unidades disponibles"
+                : added
+                  ? "✓ Añadido al carrito"
+                  : "Añadir al Carrito"}
           </button>
         </div>
       </div>

@@ -47,6 +47,9 @@ const Cart = () => {
                       </h3>
                     </Link>
                     <p className="text-sm text-slate-500">${item.price.toFixed(2)} c/u</p>
+                    {item.quantity >= item.stock && (
+                      <p className="text-xs text-amber-600 font-semibold">Máximo disponible: {item.stock}</p>
+                    )}
                   </div>
                 </div>
 
@@ -65,8 +68,10 @@ const Cart = () => {
                     </span>
                     <button
                       onClick={() => incrementQuantity(item.id)}
-                      className="px-3 py-2 text-slate-600 hover:bg-slate-100 transition"
+                      disabled={item.quantity >= item.stock}
+                      className="px-3 py-2 text-slate-600 hover:bg-slate-100 transition disabled:opacity-40 disabled:cursor-not-allowed"
                       aria-label="Aumentar cantidad"
+                      title={item.quantity >= item.stock ? "No hay más unidades disponibles" : undefined}
                     >
                       +
                     </button>
