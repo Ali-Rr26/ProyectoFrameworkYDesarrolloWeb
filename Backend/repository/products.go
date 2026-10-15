@@ -20,6 +20,7 @@ const selectProduct = `
 	       c.name,
 	       p.price::float8,
 	       p.image_url,
+	       p.stock,
 	       COALESCE(
 	           (SELECT json_agg(pi.url ORDER BY pi.position)
 	            FROM product_images pi
@@ -37,7 +38,7 @@ type scanner interface {
 func scanProduct(s scanner) (models.Product, error) {
 	var p models.Product
 	var gallery []byte
-	if err := s.Scan(&p.ID, &p.Name, &p.Description, &p.Category, &p.Price, &p.Image, &gallery); err != nil {
+	if err := s.Scan(&p.ID, &p.Name, &p.Description, &p.Category, &p.Price, &p.Image, &p.Stock, &gallery); err != nil {
 		return p, err
 	}
 	if err := json.Unmarshal(gallery, &p.Gallery); err != nil {

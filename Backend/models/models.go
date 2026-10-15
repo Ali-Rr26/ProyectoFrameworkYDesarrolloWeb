@@ -27,6 +27,8 @@ type Product struct {
 	Image string `json:"image"`
 	// Gallery contiene URLs adicionales para la galería/lightbox del producto.
 	Gallery []string `json:"gallery"`
+	// Stock son las unidades disponibles (el frontend lo usa para avisar "Agotado").
+	Stock int `json:"stock"`
 }
 
 // APIError estandariza respuestas de error HTTP.

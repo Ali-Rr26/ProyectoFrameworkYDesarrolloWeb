@@ -9,8 +9,9 @@ export interface CartItem extends Product {
 
 interface CartContextType {
   cart: CartItem[];
-  addToCart: (product: Product) => void;
+  addToCart: (product: Product) => boolean;
   removeFromCart: (id: number) => void;
+  getQuantityInCart: (id: number) => number;
   incrementQuantity: (id: number) => void;
   decrementQuantity: (id: number) => void;
   clearCart: () => void;
@@ -55,7 +56,9 @@ export const CartProvider = ({ children }: CartProviderProps) => {
   const [cart, setCart] = useState<CartItem[]>(() => {
     try {
       const saved = localStorage.getItem(storageKey);
-      return saved ? (JSON.parse(saved) as CartItem[]) : [];
+      const items = saved ? (JSON.parse(saved) as CartItem[]) : [];
+      // Se descartan ítems guardados antes de que el producto incluyera stock
+      return items.filter((item) => typeof item.stock === "number");
     } catch {
       return [];
     }
@@ -66,18 +69,27 @@ export const CartProvider = ({ children }: CartProviderProps) => {
     localStorage.setItem(storageKey, JSON.stringify(cart));
   }, [cart, storageKey]);
 
-  const addToCart = (product: Product) => {
+  // Unidades de un producto que ya están en el carrito
+  const getQuantityInCart = (id: number) =>
+    cart.find((item) => item.id === id)?.quantity ?? 0;
+
+  // Agrega una unidad si hay stock disponible. Devuelve false si se alcanzó el stock.
+  // Es solo un aviso temprano: la base de datos vuelve a validar al confirmar el pedido.
+  const addToCart = (product: Product): boolean => {
+    if (getQuantityInCart(product.id) >= product.stock) return false;
+
     setCart((prevCart) => {
       const itemExists = prevCart.find((item) => item.id === product.id);
       if (itemExists) {
         return prevCart.map((item) =>
           item.id === product.id
-            ? { ...item, quantity: item.quantity + 1 }
+            ? { ...item, stock: product.stock, quantity: Math.min(item.quantity + 1, product.stock) }
             : item
         );
       }
       return [...prevCart, { ...product, quantity: 1 }];
     });
+    return true;
   };
 
   const removeFromCart = (id: number) => {
@@ -87,7 +99,10 @@ export const CartProvider = ({ children }: CartProviderProps) => {
   const incrementQuantity = (id: number) => {
     setCart((prevCart) =>
       prevCart.map((item) =>
-        item.id === id ? { ...item, quantity: item.quantity + 1 } : item
+        // No se supera el stock conocido del producto
+        item.id === id && item.quantity < item.stock
+          ? { ...item, quantity: item.quantity + 1 }
+          : item
       )
     );
   };
@@ -116,6 +131,7 @@ export const CartProvider = ({ children }: CartProviderProps) => {
         cart,
         addToCart,
         removeFromCart,
+        getQuantityInCart,
         incrementQuantity,
         decrementQuantity,
         clearCart,

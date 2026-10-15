@@ -7,4 +7,6 @@ export interface Product {
   category: string;
   image: string;
   gallery: string[];
+  // Unidades disponibles; la validación definitiva la hace la base de datos al vender
+  stock: number;
 }
