@@ -10,19 +10,21 @@ import (
 	"multicatalogo-backend/models"
 )
 
-// CreateOrder registra un pedido completo de forma ACID:
-//  1. crea la cabecera en orders,
-//  2. por cada producto descuenta stock con un UPDATE condicional (stock >= quantity),
-//  3. inserta la línea con el precio vigente leído de la BD (nunca el enviado por el cliente).
+// CreateOrder registra un pedido completo de forma ACID dentro de una transacción:
+//  1. verifica que el comprador exista y esté activo,
+//  2. crea la cabecera en orders,
+//  3. inserta cada línea en order_items; el trigger trg_order_items_stock valida y
+//     descuenta el stock y fija unit_price con el precio vigente de la BD.
 //
-// Si cualquier paso falla se hace ROLLBACK y no queda ni pedido ni stock descontado.
+// Si cualquier paso falla se hace ROLLBACK: no queda ni pedido ni stock descontado.
 func (r *Repository) CreateOrder(ctx context.Context, userID int, req models.CreateOrderRequest) (*models.Order, error) {
 	items := mergeItems(req.Items)
 
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("iniciar transacción del pedido: %w", err)
 	}
+	// Rollback tras un Commit exitoso no hace nada; ante cualquier error deshace todo.
 	defer tx.Rollback()
 
 	// El comprador (tomado del JWT) debe seguir existiendo y estar activo:
@@ -35,7 +37,7 @@ func (r *Repository) CreateOrder(ctx context.Context, userID int, req models.Cre
 		return nil, &DomainError{Kind: ErrInvalidRef, Detail: "usuario inexistente o inactivo"}
 	}
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("verificar comprador: %w", err)
 	}
 
 	// El método de pago debe existir en el catálogo.
@@ -56,28 +58,17 @@ func (r *Repository) CreateOrder(ctx context.Context, userID int, req models.Cre
 	for _, it := range items {
 		line := models.OrderItem{ProductID: it.ProductID, Quantity: it.Quantity}
 
-		// UPDATE condicional: PostgreSQL bloquea la fila, así dos compras simultáneas
-		// no pueden dejar el stock negativo (evita la carrera "leer y luego restar").
+		// No se envía unit_price: lo fija el trigger con el precio de la BD, junto con
+		// la validación y el descuento de stock (bloquea la fila del producto).
 		err := tx.QueryRowContext(ctx, `
-			UPDATE products SET stock = stock - $1
-			WHERE id = $2 AND stock >= $1
-			RETURNING name, price::float8`,
-			it.Quantity, it.ProductID,
-		).Scan(&line.Name, &line.UnitPrice)
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, productUnavailableError(ctx, tx, it.ProductID)
-		}
-		if err != nil {
-			return nil, mapError(err)
-		}
-
-		// unit_price se copia desde products dentro de la misma transacción (valor NUMERIC exacto).
-		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO order_items (order_id, product_id, quantity, unit_price)
-			SELECT $1, id, $3, price FROM products WHERE id = $2`,
+			INSERT INTO order_items (order_id, product_id, quantity)
+			VALUES ($1, $2, $3)
+			RETURNING unit_price::float8,
+			          (SELECT p.name FROM products p WHERE p.id = order_items.product_id)`,
 			order.ID, it.ProductID, it.Quantity,
-		); err != nil {
-			return nil, mapError(err)
+		).Scan(&line.UnitPrice, &line.Name)
+		if err != nil {
+			return nil, orderItemError(err, it.ProductID)
 		}
 		order.Items = append(order.Items, line)
 	}
@@ -86,27 +77,27 @@ func (r *Repository) CreateOrder(ctx context.Context, userID int, req models.Cre
 	if err := tx.QueryRowContext(ctx,
 		`SELECT total::float8 FROM v_order_totals WHERE order_id = $1`, order.ID,
 	).Scan(&order.Total); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("calcular total del pedido: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("confirmar pedido: %w", err)
 	}
 	return &order, nil
 }
 
-// productUnavailableError distingue entre producto inexistente y stock insuficiente.
-func productUnavailableError(ctx context.Context, tx *sql.Tx, productID int) error {
-	var exists bool
-	if err := tx.QueryRowContext(ctx,
-		`SELECT EXISTS (SELECT 1 FROM products WHERE id = $1)`, productID,
-	).Scan(&exists); err != nil {
-		return err
-	}
-	if !exists {
+// orderItemError traduce el error de una línea del pedido indicando el producto
+// afectado: stock insuficiente (409) o producto inexistente (422).
+func orderItemError(err error, productID int) error {
+	mapped := mapError(err)
+	switch {
+	case errors.Is(mapped, ErrInsufficientStock):
+		return &DomainError{Kind: ErrInsufficientStock, Detail: fmt.Sprintf("producto %d", productID)}
+	case errors.Is(mapped, ErrInvalidRef):
 		return &DomainError{Kind: ErrInvalidRef, Detail: fmt.Sprintf("producto %d inexistente", productID)}
+	default:
+		return mapped
 	}
-	return &DomainError{Kind: ErrInsufficientStock, Detail: fmt.Sprintf("producto %d", productID)}
 }
 
 // mergeItems suma cantidades del mismo producto (la PK de order_items es

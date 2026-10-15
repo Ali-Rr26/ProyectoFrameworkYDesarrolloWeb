@@ -162,6 +162,76 @@ CREATE TABLE order_items (
 CREATE INDEX ix_order_items_product ON order_items (product_id);
 
 -- -----------------------------------------------------------------------------
+-- Control de inventario: la base de datos es la autoridad del stock.
+-- Toda venta (API, SQL directo, seed o cualquier otro cliente) pasa por este
+-- trigger, que corre dentro de la transacción de quien inserta: si una línea
+-- falla, PostgreSQL revierte el pedido completo y el stock ya descontado.
+--   INSERT: descuenta con un UPDATE condicional (stock >= quantity). El UPDATE
+--           bloquea la fila del producto, por lo que dos ventas simultáneas no
+--           pueden vender la última unidad dos veces. Además fija unit_price
+--           con el precio vigente: el precio nunca lo decide el cliente.
+--   UPDATE: ajusta solo la diferencia de cantidad (descuenta o repone).
+--   DELETE: repone las unidades (pedido cancelado o borrado en cascada).
+-- Los errores usan SQLSTATE estándar y un nombre de restricción propio para que
+-- el backend distinga "stock insuficiente" sin interpretar el texto del mensaje.
+-- -----------------------------------------------------------------------------
+CREATE FUNCTION fn_order_items_stock() RETURNS trigger AS $$
+DECLARE
+    v_price NUMERIC(10,2);
+    v_delta INTEGER;
+BEGIN
+    IF TG_OP = 'DELETE' THEN
+        UPDATE products SET stock = stock + OLD.quantity WHERE id = OLD.product_id;
+        RETURN OLD;
+    END IF;
+
+    IF TG_OP = 'UPDATE' THEN
+        -- Cambiar el producto de una línea alteraría el historial: se exige borrar e insertar.
+        IF NEW.product_id <> OLD.product_id THEN
+            RAISE EXCEPTION 'No se puede cambiar el producto de una línea de pedido'
+                USING ERRCODE = 'check_violation', CONSTRAINT = 'ck_order_items_product_immutable';
+        END IF;
+
+        v_delta := NEW.quantity - OLD.quantity;
+        IF v_delta > 0 THEN
+            UPDATE products SET stock = stock - v_delta
+            WHERE id = NEW.product_id AND stock >= v_delta;
+            IF NOT FOUND THEN
+                RAISE EXCEPTION 'Stock insuficiente para el producto %', NEW.product_id
+                    USING ERRCODE = 'check_violation', CONSTRAINT = 'ck_products_stock_available';
+            END IF;
+        ELSIF v_delta < 0 THEN
+            UPDATE products SET stock = stock - v_delta WHERE id = NEW.product_id;
+        END IF;
+        -- El precio histórico de la línea no cambia al ajustar la cantidad.
+        NEW.unit_price := OLD.unit_price;
+        RETURN NEW;
+    END IF;
+
+    -- INSERT
+    UPDATE products SET stock = stock - NEW.quantity
+    WHERE id = NEW.product_id AND stock >= NEW.quantity
+    RETURNING price INTO v_price;
+
+    IF NOT FOUND THEN
+        IF NOT EXISTS (SELECT 1 FROM products WHERE id = NEW.product_id) THEN
+            RAISE EXCEPTION 'El producto % no existe', NEW.product_id
+                USING ERRCODE = 'foreign_key_violation', CONSTRAINT = 'order_items_product_id_fkey';
+        END IF;
+        RAISE EXCEPTION 'Stock insuficiente para el producto %', NEW.product_id
+            USING ERRCODE = 'check_violation', CONSTRAINT = 'ck_products_stock_available';
+    END IF;
+
+    NEW.unit_price := v_price;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_order_items_stock
+    BEFORE INSERT OR UPDATE OF quantity, product_id OR DELETE ON order_items
+    FOR EACH ROW EXECUTE FUNCTION fn_order_items_stock();
+
+-- -----------------------------------------------------------------------------
 -- Vistas de datos derivados (se calculan, no se almacenan).
 -- -----------------------------------------------------------------------------
 CREATE VIEW v_order_totals AS

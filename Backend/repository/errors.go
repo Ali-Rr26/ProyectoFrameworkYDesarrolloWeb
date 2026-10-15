@@ -29,6 +29,10 @@ const (
 	pgNotNullViolation    = "23502"
 )
 
+// stockConstraint es la restricción que lanza el trigger de inventario
+// (fn_order_items_stock) cuando no hay unidades suficientes.
+const stockConstraint = "ck_products_stock_available"
+
 // mapError convierte errores del driver en errores del dominio, conservando el original envuelto.
 func mapError(err error) error {
 	if err == nil {
@@ -45,6 +49,10 @@ func mapError(err error) error {
 		case pgForeignKeyViolation:
 			return &DomainError{Kind: ErrInvalidRef, Detail: pgErr.ConstraintName}
 		case pgCheckViolation, pgNotNullViolation:
+			// El trigger de inventario usa check_violation con una restricción propia.
+			if pgErr.ConstraintName == stockConstraint {
+				return &DomainError{Kind: ErrInsufficientStock, Detail: pgErr.Message}
+			}
 			detail := pgErr.ConstraintName
 			if detail == "" {
 				detail = pgErr.Message

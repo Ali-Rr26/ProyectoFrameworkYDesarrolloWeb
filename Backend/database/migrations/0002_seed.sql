@@ -17,8 +17,10 @@ INSERT INTO payment_methods (name)
 VALUES ('Tarjeta de crédito'), ('Transferencia bancaria'), ('Efectivo contra entrega');
 
 -- Productos (ORDER BY pos: reciben los IDs 1..8 en una base nueva) -------------
+-- Stock inicial 200: los pedidos semilla de abajo lo descuentan a través del
+-- trigger de inventario (p. ej. la Mascarilla Nocturna termina en 91).
 INSERT INTO products (name, description, price, stock, category_id, image_url)
-SELECT p.name, p.description, p.price, 100, c.id, p.image_url
+SELECT p.name, p.description, p.price, 200, c.id, p.image_url
 FROM (VALUES
     (1, 'Serum Revitalizante', 'Serum concentrado con vitamina C y ácido hialurónico. Ilumina la piel, reduce manchas y aporta hidratación profunda desde la primera aplicación.', 'Serum', 45.00, 'https://picsum.photos/seed/serum/600'),
     (2, 'Crema Hidratante Pro', 'Crema facial de textura ligera con niacinamida y manteca de karité. Hidratación de 24 horas y barrera cutánea fortalecida para todo tipo de piel.', 'Crema', 32.50, 'https://picsum.photos/seed/crema/600'),
@@ -106,9 +108,10 @@ FROM (SELECT DISTINCT email FROM seed_sales) ss
 JOIN users u ON u.email = ss.email
 JOIN payment_methods pm ON pm.name = 'Tarjeta de crédito';
 
--- Detalle con el precio vigente como unit_price.
-INSERT INTO order_items (order_id, product_id, quantity, unit_price)
-SELECT o.id, p.id, ss.quantity, p.price
+-- Detalle: el trigger trg_order_items_stock descuenta el stock y fija
+-- unit_price con el precio vigente de cada producto.
+INSERT INTO order_items (order_id, product_id, quantity)
+SELECT o.id, p.id, ss.quantity
 FROM seed_sales ss
 JOIN users u    ON u.email = ss.email
 JOIN orders o   ON o.user_id = u.id
