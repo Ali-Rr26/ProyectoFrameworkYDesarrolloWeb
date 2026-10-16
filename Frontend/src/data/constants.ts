@@ -1,4 +1,6 @@
-export const API_URL = 'http://localhost:4000';
+// URL base del backend desde .env (VITE_API_URL); el valor por defecto sirve para desarrollo.
+// Se quita la barra final para que `${API_URL}/api/...` no genere "//api".
+export const API_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:4000').replace(/\/+$/, '');
 
 // Porcentaje de comisión que genera cada nivel de la red (1 = referido directo)
 export const COMMISSION_RATES: Record<number, number> = {
