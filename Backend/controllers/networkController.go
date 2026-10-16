@@ -1,50 +1,98 @@
 package controllers
 
 import (
+	"context"
+	"log"
 	"strconv"
 
 	"github.com/gofiber/fiber/v2"
+
+	"multicatalogo-backend/cache"
+	"multicatalogo-backend/models"
 )
 
-// GetNetwork devuelve el árbol de referidos multinivel leído desde PostgreSQL (requiere JWT).
+// GetNetwork devuelve el árbol de referidos multinivel (requiere JWT), con Cache-Aside
+// sobre la clave red:tree:{email de la raíz} (TTL 10 min).
 // Raíz según el rol del token:
 //   - customer: siempre su propia red (se ignora ?user_id para que no consulte redes ajenas).
 //   - admin:    ?user_id=<id> si se envía; si no, el usuario configurado en NETWORK_ROOT_EMAIL.
+//
+// La clave identifica al árbol (su raíz), no a quien consulta: el cliente y el admin que
+// miran la misma red comparten una sola entrada, y la invalidación siempre la encuentra.
 func (h *Handler) GetNetwork(c *fiber.Ctx) error {
 	ctx, cancel := dbCtx(c)
 	defer cancel()
 
 	claims := currentClaims(c)
-	var rootID int
-	if claims.Role != "admin" {
-		id, err := claims.UserID()
-		if err != nil {
-			return apiError(c, fiber.StatusUnauthorized, "Token inválido o expirado", nil)
-		}
-		rootID = id
-	} else if q := c.Query("user_id"); q != "" {
+	requesterID, err := claims.UserID()
+	if err != nil {
+		return apiError(c, fiber.StatusUnauthorized, "Token inválido o expirado", nil)
+	}
+
+	// 1. Resolver el email de la raíz (para la clave) y cómo obtener su ID ante un Cache Miss.
+	var email string
+	var rootID func() (int, error)
+	switch q := c.Query("user_id"); {
+	case claims.Role != "admin":
+		// El email viaja en el JWT: no hace falta ninguna consulta para armar la clave.
+		email = claims.Email
+		rootID = func() (int, error) { return requesterID, nil }
+	case q != "":
 		id, err := strconv.Atoi(q)
 		if err != nil {
 			return apiError(c, fiber.StatusBadRequest, "user_id inválido, debe ser un número", q)
 		}
-		rootID = id
-	} else {
-		user, err := h.repo.GetUserByEmail(ctx, h.cfg.NetworkRootEmail)
-		if err != nil {
+		if email, err = h.repo.GetUserEmailByID(ctx, id); err != nil {
 			return repoError(c, err)
 		}
-		rootID = user.ID
+		rootID = func() (int, error) { return id, nil }
+	default:
+		// En un Cache Hit tampoco se busca al usuario raíz por email: se ahorran dos consultas.
+		email = h.cfg.NetworkRootEmail
+		rootID = func() (int, error) {
+			user, err := h.repo.GetUserByEmail(ctx, email)
+			if err != nil {
+				return 0, err
+			}
+			return user.ID, nil
+		}
 	}
 
-	tree, err := h.repo.GetNetwork(ctx, rootID)
+	// 2. Cache-Aside sobre el árbol neutro (sin personalizar para quien consulta).
+	tree, status, err := cache.GetOrLoad(ctx, h.rdb, cache.NetworkKey(email), cache.TTLNetwork,
+		func() (*models.NetworkNode, error) {
+			id, err := rootID()
+			if err != nil {
+				return nil, err
+			}
+			return h.repo.GetNetwork(ctx, id)
+		})
 	if err != nil {
 		return repoError(c, err)
 	}
 
-	// "Tú" solo cuando la raíz es quien consulta; si un admin ve la red de otro
-	// miembro, se conserva el nombre real para que quede claro de quién es la red.
-	if requesterID, err := claims.UserID(); err == nil && requesterID == rootID {
+	// 3. Personalizar después de la caché: "Tú" solo cuando la raíz es quien consulta; si un
+	// admin ve la red de otro miembro se conserva el nombre real. Si esto se guardara en
+	// caché, el admin vería "Tú" en la red que antes consultó su dueño.
+	if requesterID == tree.ID {
 		tree.Name = "Tú"
 	}
+	c.Set(cache.HeaderName, string(status))
 	return c.JSON(tree)
+}
+
+// invalidateNetwork borra de la caché los árboles en los que aparece userID: el suyo y los
+// de sus patrocinadores hasta MaxNetworkLevel niveles arriba. Se llama tras una escritura
+// ya confirmada, por eso un fallo solo se registra (el TTL acota el dato desactualizado).
+func (h *Handler) invalidateNetwork(ctx context.Context, userID int) {
+	emails, err := h.repo.GetUplineEmails(ctx, userID)
+	if err != nil {
+		log.Printf("cache: no se pudo calcular la red de %d para invalidar: %v", userID, err)
+		return
+	}
+	keys := make([]string, len(emails))
+	for i, e := range emails {
+		keys[i] = cache.NetworkKey(e)
+	}
+	cache.Delete(h.rdb, keys...)
 }
