@@ -46,7 +46,7 @@ React SPA (Vite :5175) ──fetch + JWT──► Go/Fiber API (:4000, env PORT)
 
 Stack: React 19 + TypeScript 6 + Vite 8 + Tailwind CSS 4 + React Router 7.
 Comandos: `npm run dev` (:5175, `strictPort`) | `npm run build` | `npm run lint`.
-Nombre del paquete: `practica02-react-bases`. URL de la API fija en `data/constants.ts` (`http://localhost:4000`).
+Nombre del paquete: `multicatalogo-frontend`. URL de la API fija en `data/constants.ts` (`http://localhost:4000`).
 
 | Ruta (`src/`) | Responsabilidad |
 |---|---|
