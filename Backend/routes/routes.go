@@ -29,8 +29,8 @@ func SetupRoutes(app *fiber.App, c Controllers) {
 	app.Get("/api/products", c.Products.GetProducts)
 	app.Get("/api/products/:id", c.Products.GetProductByID)
 
-	// Estado del servidor, de PostgreSQL y de Redis.
-	app.Get("/api/health", controllers.Health)
+	// Estado del servidor con sus dependencias (ok / degraded / 503) y pings individuales.
+	app.Get("/api/health", c.Health.Health)
 	app.Get("/api/health/db", c.Health.HealthDB)
 	app.Get("/api/health/redis", c.Health.HealthRedis)
 
