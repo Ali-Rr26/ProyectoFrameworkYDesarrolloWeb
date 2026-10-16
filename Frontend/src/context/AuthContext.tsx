@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { setAuthToken, setUnauthorizedHandler } from '../services/apiClient';
+import { getMe } from '../services/userService';
 import { AuthContext, type User } from './auth';
 
 // 1. Sesión completa: usuario + JWT + fecha de expiración del token
@@ -77,6 +78,38 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const timer = setTimeout(logout, Math.max(remaining, 0));
     return () => clearTimeout(timer);
   }, [session, logout]);
+
+  // Verificación de la sesión contra el servidor (GET /api/me) al cargar la app y cada vez
+  // que el usuario vuelve a la pestaña. Si un admin desactivó la cuenta, el backend responde
+  // 401 y el manejador de arriba cierra la sesión (ProtectedRoute lleva al login). Si cambió
+  // el rol, se adopta el vigente (AdminRoute redirige a quien dejó de ser admin).
+  const token = session?.token;
+  useEffect(() => {
+    if (!token) return;
+    const verify = () => {
+      getMe()
+        .then((me) =>
+          setSession((prev) => {
+            if (!prev || (prev.user.role === me.role && prev.user.email === me.email)) return prev;
+            const updated = { ...prev, user: { email: me.email, role: me.role } };
+            try {
+              sessionStorage.setItem(SESSION_KEY, JSON.stringify(updated));
+            } catch {
+              // Sin almacenamiento disponible el cambio dura mientras la página esté abierta.
+            }
+            return updated;
+          })
+        )
+        // El 401 ya lo atiende apiFetch; un fallo de red no debe cerrar la sesión.
+        .catch(() => undefined);
+    };
+    verify();
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') verify();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [token]);
 
   return (
     <AuthContext.Provider

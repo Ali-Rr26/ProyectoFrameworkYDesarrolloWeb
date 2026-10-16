@@ -10,6 +10,8 @@ import Cart from './components/Cart';
 import Checkout from './components/Checkout';
 import Confirmation from './components/Confirmation';
 import Login from './components/Login';
+import Register from './components/Register';
+import AdminUsers from './components/AdminUsers';
 import { CartProvider } from './context/CartContext';
 import { AuthProvider } from './context/AuthContext';
 import { useAuth } from './context/auth';
@@ -62,6 +64,7 @@ function App() {
           <Routes>
             {/* Ruta pública */}
             <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
 
             {/* Rutas protegidas (requieren login) */}
             <Route element={<ProtectedRoute />}>
@@ -70,6 +73,7 @@ function App() {
                 <Route element={<AdminRoute />}>
                   <Route index element={<Dashboard />} />
                   <Route path="my-network" element={<MyNetwork />} />
+                  <Route path="admin/users" element={<AdminUsers />} />
                 </Route>
 
                 {/* Ambos roles: flujo de compra en línea */}

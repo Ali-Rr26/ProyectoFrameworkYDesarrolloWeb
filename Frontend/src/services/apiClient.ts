@@ -28,7 +28,7 @@ export class ApiError extends Error {
 }
 
 interface ApiOptions {
-  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   body?: unknown;
   // auth=false para rutas públicas (login, catálogo): no envía token ni dispara el cierre de sesión.
   auth?: boolean;

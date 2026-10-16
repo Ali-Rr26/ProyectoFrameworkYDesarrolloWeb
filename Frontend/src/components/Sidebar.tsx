@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, PackageSearch, Contact, Store } from 'lucide-react';
+import { LayoutDashboard, PackageSearch, Contact, Store, Users } from 'lucide-react';
 import { useAuth } from '../context/auth';
 import { ICON_SIZES } from '../constants/ui';
 import { ROLE_LABELS } from '../data/constants';
@@ -50,6 +50,13 @@ const Sidebar = ({ isOpen, isCollapsed, onCloseSidebar }: SidebarProps) => {
       title: "Mi Red",
       adminOnly: true,
       icon: <Contact size={ICON_SIZES.SIDEBAR} className="flex-shrink-0" />,
+    },
+    {
+      to: "/admin/users",
+      label: "Usuarios",
+      title: "Usuarios",
+      adminOnly: true,
+      icon: <Users size={ICON_SIZES.SIDEBAR} className="flex-shrink-0" />,
     },
   ];
 
