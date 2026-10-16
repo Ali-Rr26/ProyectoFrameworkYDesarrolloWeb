@@ -52,5 +52,9 @@ func (h *Handler) RegisterUser(c *fiber.Ctx) error {
 	if err != nil {
 		return repoError(c, err)
 	}
+	// Un nuevo afiliado aparece en los árboles de su patrocinador y de los niveles superiores.
+	if req.SponsorID != nil {
+		h.invalidateNetwork(ctx, user.ID)
+	}
 	return c.Status(fiber.StatusCreated).JSON(user)
 }
