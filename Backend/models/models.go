@@ -51,8 +51,27 @@ type NetworkNode struct {
 	Level int `json:"level"`
 	// Sales son las ventas acumuladas del miembro en dólares.
 	Sales float64 `json:"sales"`
+	// Commission es lo que las compras de este miembro le pagaron en comisiones a la raíz
+	// (registradas en la tabla commissions). En la raíz siempre es 0.
+	Commission float64 `json:"commission"`
+	// Summary solo viene en la raíz: su saldo de comisiones.
+	Summary *NetworkSummary `json:"summary,omitempty"`
 	// Children son los referidos que este miembro ha traído (un nivel más abajo).
 	Children []NetworkNode `json:"children,omitempty"`
+}
+
+// NetworkSummary resume las comisiones cobradas por la raíz del árbol (KPIs del dashboard).
+type NetworkSummary struct {
+	// CommissionsMonth es lo cobrado en el mes calendario en curso.
+	CommissionsMonth float64 `json:"commissions_month"`
+	// CommissionsTotal es lo cobrado desde siempre.
+	CommissionsTotal float64 `json:"commissions_total"`
+}
+
+// PendingCommission es un pedido confirmado cuyas comisiones aún no se registraron.
+type PendingCommission struct {
+	OrderID int
+	BuyerID int
 }
 
 // User representa una cuenta almacenada en la tabla users (junto al nombre de su rol).
