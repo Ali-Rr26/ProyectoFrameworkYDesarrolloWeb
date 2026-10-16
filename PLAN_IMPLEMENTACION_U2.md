@@ -90,22 +90,33 @@ genérico (decisión anti-enumeración; el análisis sugería 401/403).
 
 **Backend**
 
-- [ ] `POST /api/users` acepta `referral_code` (además de `sponsor_id`); código inexistente → `400`
-- [ ] Generar `referral_code` único al afiliar un usuario nuevo
-- [ ] `GET /api/network` incluye el `referral_code` de la raíz
-- [ ] `PATCH /api/users/:id` (admin): cambiar rol y `active`; invalidar `red:tree:*` afectados (antes: `PATCH /api/usuarios/:id`)
+- [x] `POST /api/users` acepta `referral_code` (además de `sponsor_id`, no ambos); se normaliza a mayúsculas; código inexistente → `400 "Código de referido inválido"`
+- [x] Generar `referral_code` único al afiliar un usuario nuevo (trigger de la Fase 1); todo registro queda afiliado, como raíz si no trae patrocinador, para tener su propio código
+- [x] `GET /api/network` incluye el `referral_code` de la raíz; `GET /api/users` también lo muestra
+- [x] `PATCH /api/users/:id` (admin): cambiar rol y `active`; invalidar `red:tree:*` afectados; un admin no puede cambiar su propio rol ni desactivarse (`400`) (antes: `PATCH /api/usuarios/:id`)
+
+- [x] Validación de correo estricta (`validEmail`): solo `usuario@dominio.tld`, sin nombre ni `<...>` y con punto en el dominio
+- [x] Contraseña fuerte (`passwordProblems`): 8+ caracteres (máx. 72 bytes), mayúscula, minúscula, número y carácter especial; `details.password` indica qué falta (las cuentas demo conservan `123456`: la regla aplica al registro)
+- [x] Sesión vigente: `RequireAuth` consulta la cuenta (`AccountLookup` → `GetUserByID`) en cada petición autenticada; cuenta desactivada o inexistente → `401`, y el rol y el email salen de la base (un admin degradado pierde el acceso de inmediato)
+- [x] `GET /api/me`: cuenta autenticada con su estado vigente
 
 **Frontend**
 
-- [ ] Vista pública `/register`: nombre, email, contraseña, código de referido (prefill desde `?ref=`), un campo por fila (antes: `/registro`)
-- [ ] Enlace "Crear cuenta" en `Login.tsx`; tras registrar → `/login` con aviso de éxito
-- [ ] Vista admin `/admin/users`: tabla de cuentas + activar/desactivar y cambio de rol (antes: `/admin/usuarios`)
+- [ ] Vista pública `/register`: nombre, email, contraseña, código de referido (prefill desde `?ref=`), un campo por fila (antes: `/registro`) — implementada (`Register.tsx`); falta verificación en navegador
+- [ ] Enlace "Crear cuenta" en `Login.tsx`; tras registrar → `/login` con aviso de éxito — implementado; falta verificación en navegador
+- [ ] `/register` con lista de reglas de contraseña que se marcan al escribir y aviso de correo inválido (`data/validation.ts`, misma lógica que el backend) — implementado; falta verificación en navegador
+- [ ] `AuthContext` verifica la sesión con `GET /api/me` al cargar la app y al volver a la pestaña: cuenta desactivada → vuelve al login; rol cambiado → se aplica el vigente — implementado; falta verificación en navegador
+- [ ] Vista admin `/admin/users`: tabla de cuentas + activar/desactivar y cambio de rol (antes: `/admin/usuarios`) — implementada (`AdminUsers.tsx` + entrada "Usuarios" en el sidebar); falta verificación en navegador
 
 **Verificación**
 
-- [ ] `POST /api/users` con `referral_code` válido → `201`; login → `200`; `SELECT sponsor_id FROM network_members` apunta al patrocinador
-- [ ] Código inválido → `400`; email duplicado → `409`
-- [ ] Cuenta desactivada desde `/admin/users` → login `401`
+- [x] `POST /api/users` con `referral_code` válido → `201`; login → `200`; `SELECT sponsor_id FROM network_members` apunta al patrocinador
+- [x] Código inválido → `400`; email duplicado → `409`
+- [x] Cuenta desactivada desde `/admin/users` → login `401` (verificado vía `PATCH /api/users/:id`)
+- [x] Cuenta desactivada estando logueada → su mismo token recibe `401` en `/api/me` y `/api/network`
+- [x] Admin degradado a customer → su token de admin recibe `403` en `GET /api/users`
+- [x] Contraseña débil y correo con nombre o sin dominio con punto → `400` con el detalle por campo
+- [x] Paridad de reglas frontend/backend: 20 casos iguales en `data/validation.ts` y `validation.go`
 
 ---
 
@@ -265,7 +276,7 @@ errores por campo.
 |---|---|---|
 | 0 | Brechas del sílabo: `VITE_API_URL`, lint 0, touch 44px, health con deps + healthcheck, `JWT_TTL` 2h, `APP_ENV`, `ErrInvalidQuantity` | 🟡 Implementada y verificada — falta la auditoría visual a 375px |
 | 1 | Migración `0004_backoffice.sql` | ✅ Implementada y verificada |
-| 2 | Registro con código de referido + admin de usuarios + vistas | ⏳ Pendiente (base: `POST /api/users`) |
+| 2 | Registro con código de referido + admin de usuarios + vistas | 🟡 Backend verificado; vistas implementadas, falta recorrido en navegador |
 | 3 | CRUD productos (edición + baja lógica) | ⏳ Pendiente (base: `POST /api/products`) |
 | 4 | Pedidos: consulta, estados, cancelación ACID | ⏳ Pendiente |
 | 5 | Comisiones del distribuidor + red visible al cliente | ⏳ Pendiente (base: ledger y `GET /api/network`) |
