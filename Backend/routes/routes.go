@@ -43,6 +43,9 @@ func SetupRoutes(app *fiber.App, c Controllers) {
 	auth := c.Auth.RequireAuth
 	adminOnly := c.Auth.RequireRole("admin")
 
+	// Cuenta autenticada (el frontend valida la sesión al cargar).
+	app.Get("/api/me", auth, c.Login.Me)
+
 	// Red de referidos: el cliente ve la suya; el admin puede consultar cualquiera.
 	app.Get("/api/network", auth, c.Network.GetNetwork)
 
@@ -54,5 +57,6 @@ func SetupRoutes(app *fiber.App, c Controllers) {
 
 	// Solo administrador.
 	app.Get("/api/users", auth, adminOnly, c.Users.GetUsers)
+	app.Patch("/api/users/:id", auth, adminOnly, c.Users.UpdateUser)
 	app.Post("/api/products", auth, adminOnly, c.Products.CreateProduct)
 }

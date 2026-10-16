@@ -37,6 +37,7 @@ type OrderRepository interface {
 type UserRepository interface {
 	GetUsers(ctx context.Context) ([]models.User, error)
 	CreateUser(ctx context.Context, in models.RegisterRequest) (*models.User, error)
+	UpdateUser(ctx context.Context, id int, in models.UpdateUserRequest) (*models.User, error)
 }
 
 // CredentialRepository busca la cuenta con la que se inicia sesión.
@@ -52,6 +53,12 @@ type Pinger interface {
 // TokenIssuer emite JWT (login).
 type TokenIssuer interface {
 	Generate(userID int, email, role string) (string, time.Time, error)
+}
+
+// AccountLookup consulta el estado vigente de una cuenta (middleware de autenticación):
+// el JWT dice quién es el usuario, la base dice si sigue activo y con qué rol.
+type AccountLookup interface {
+	GetUserByID(ctx context.Context, id int) (*models.User, error)
 }
 
 // TokenParser valida JWT (middleware).

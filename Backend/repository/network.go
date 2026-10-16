@@ -52,8 +52,9 @@ type treeNode struct {
 	children []*treeNode
 }
 
-// GetNetwork devuelve el árbol de referidos con raíz en rootUserID (con el resumen de
-// comisiones de la raíz), o ErrNotFound si ese usuario no está afiliado a la red.
+// GetNetwork devuelve el árbol de referidos con raíz en rootUserID (con el código de
+// referido y el resumen de comisiones de la raíz), o ErrNotFound si ese usuario no está
+// afiliado a la red.
 func (r *Repository) GetNetwork(ctx context.Context, rootUserID int) (*models.NetworkNode, error) {
 	rows, err := r.db.QueryContext(ctx, networkQuery, rootUserID, MaxNetworkLevel)
 	if err != nil {
@@ -91,6 +92,11 @@ func (r *Repository) GetNetwork(ctx context.Context, rootUserID int) (*models.Ne
 		return nil, err
 	}
 	tree.Summary = summary
+	if err := r.db.QueryRowContext(ctx,
+		`SELECT referral_code FROM network_members WHERE user_id = $1`, rootUserID,
+	).Scan(&tree.ReferralCode); err != nil {
+		return nil, mapError(err)
+	}
 	return &tree, nil
 }
 

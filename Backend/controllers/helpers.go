@@ -67,6 +67,8 @@ func repoError(c *fiber.Ctx, err error) error {
 		return apiError(c, fiber.StatusConflict, "El registro ya existe", detail)
 	case errors.Is(err, repository.ErrInvalidQuantity):
 		return apiError(c, fiber.StatusBadRequest, msgInvalidQuantity, detail)
+	case errors.Is(err, repository.ErrInvalidReferral):
+		return apiError(c, fiber.StatusBadRequest, "Código de referido inválido", detail)
 	case errors.Is(err, repository.ErrProductInactive):
 		return apiError(c, fiber.StatusUnprocessableEntity, "Producto no disponible", detail)
 	case errors.Is(err, repository.ErrInsufficientStock):

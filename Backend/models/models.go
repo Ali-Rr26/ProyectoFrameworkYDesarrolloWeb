@@ -54,6 +54,8 @@ type NetworkNode struct {
 	// Commission es lo que las compras de este miembro le pagaron en comisiones a la raíz
 	// (registradas en la tabla commissions). En la raíz siempre es 0.
 	Commission float64 `json:"commission"`
+	// ReferralCode solo viene en la raíz: su código para invitar (/register?ref=CODIGO).
+	ReferralCode string `json:"referral_code,omitempty"`
 	// Summary solo viene en la raíz: su saldo de comisiones.
 	Summary *NetworkSummary `json:"summary,omitempty"`
 	// Children son los referidos que este miembro ha traído (un nivel más abajo).
@@ -90,6 +92,8 @@ type User struct {
 	Active bool `json:"active"`
 	// SponsorID es el patrocinador en la red MLM (nil si es raíz o no está afiliado).
 	SponsorID *int `json:"sponsor_id"`
+	// ReferralCode es su código de invitación (nil si no está afiliado a la red).
+	ReferralCode *string `json:"referral_code"`
 }
 
 // ProductInput es el cuerpo esperado para crear un producto (POST /api/products).
@@ -109,8 +113,17 @@ type RegisterRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
 	Name     string `json:"name"`
-	// SponsorID es opcional: si viene, el usuario se afilia a la red bajo ese patrocinador.
-	SponsorID *int `json:"sponsor_id"`
+	// SponsorID y ReferralCode son opcionales y excluyentes: identifican al patrocinador
+	// por su ID o por su código de invitación. Sin ninguno, el usuario es raíz de su red.
+	SponsorID    *int    `json:"sponsor_id"`
+	ReferralCode *string `json:"referral_code"`
+}
+
+// UpdateUserRequest es el cuerpo de PATCH /api/users/:id (solo admin): los campos
+// omitidos no se modifican.
+type UpdateUserRequest struct {
+	Role   *string `json:"role"`
+	Active *bool   `json:"active"`
 }
 
 // OrderItemInput es una línea del pedido enviada por el cliente (el precio lo pone el servidor).

@@ -86,7 +86,7 @@ func main() {
 	commissions.RecoverPending()
 
 	ctrls := routes.Controllers{
-		Auth:     controllers.NewAuthMiddleware(jwtManager),
+		Auth:     controllers.NewAuthMiddleware(jwtManager, repo),
 		Login:    controllers.NewAuthController(repo, jwtManager),
 		Products: controllers.NewProductController(repo, redisCache),
 		Network:  controllers.NewNetworkController(repo, redisCache, cfg.NetworkRootEmail),

@@ -24,6 +24,8 @@ var (
 	ErrInvalidQuantity = errors.New("cantidad inválida")
 	// ErrProductInactive: el producto fue dado de baja y ya no se vende (HTTP 422).
 	ErrProductInactive = errors.New("producto no disponible")
+	// ErrInvalidReferral: el código de referido no corresponde a ningún afiliado (HTTP 400).
+	ErrInvalidReferral = errors.New("código de referido inválido")
 )
 
 // Códigos SQLSTATE de PostgreSQL que traducimos.
