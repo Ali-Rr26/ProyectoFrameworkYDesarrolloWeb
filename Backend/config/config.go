@@ -15,6 +15,8 @@ import (
 type Config struct {
 	// DatabaseURL es la cadena de conexión a PostgreSQL.
 	DatabaseURL string
+	// RedisURL es la URI del servidor Redis usado como caché (redis://host:puerto/bd).
+	RedisURL string
 	// Port es el puerto HTTP donde escucha Fiber.
 	Port string
 	// CORSOrigin es el origen permitido para el frontend.
@@ -39,6 +41,7 @@ func Load() (*Config, error) {
 
 	cfg := &Config{
 		DatabaseURL:      os.Getenv("DATABASE_URL"),
+		RedisURL:         getEnv("REDIS_URL", "redis://localhost:6379/0"),
 		Port:             getEnv("PORT", "4000"),
 		CORSOrigin:       getEnv("CORS_ORIGIN", "http://localhost:5175"),
 		NetworkRootEmail: getEnv("NETWORK_ROOT_EMAIL", "cliente@upse.edu.ec"),
