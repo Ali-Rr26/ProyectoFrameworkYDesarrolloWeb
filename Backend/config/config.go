@@ -19,6 +19,9 @@ type Config struct {
 	RedisURL string
 	// Port es el puerto HTTP donde escucha Fiber.
 	Port string
+	// AppEnv es el entorno de ejecución: "dev" expone el detalle técnico de los errores
+	// (APIError.Details); cualquier otro valor (por defecto "production") lo oculta.
+	AppEnv string
 	// CORSOrigin es el origen permitido para el frontend.
 	CORSOrigin string
 	// NetworkRootEmail es la raíz por defecto de GET /api/network cuando consulta un admin.
@@ -35,6 +38,20 @@ type Config struct {
 	CheckoutCommitDelay time.Duration
 }
 
+// DefaultPort es el puerto HTTP cuando no se define PORT.
+const DefaultPort = "4000"
+
+// Entornos de APP_ENV.
+const (
+	// EnvDev expone el detalle técnico de los errores para depurar.
+	EnvDev = "dev"
+	// EnvProduction es el valor por defecto: los errores no revelan detalles internos.
+	EnvProduction = "production"
+)
+
+// IsDev indica si la aplicación corre en modo desarrollo.
+func (c *Config) IsDev() bool { return c.AppEnv == EnvDev }
+
 // Etapas válidas de CHECKOUT_FAIL_AT.
 const (
 	// FailAfterOrder falla después de insertar la cabecera del pedido.
@@ -48,7 +65,7 @@ func Load() (*Config, error) {
 	// Si no existe .env no es un error: las variables pueden venir del sistema operativo.
 	_ = godotenv.Load()
 
-	ttl, err := time.ParseDuration(getEnv("JWT_TTL", "8h"))
+	ttl, err := time.ParseDuration(getEnv("JWT_TTL", "2h"))
 	if err != nil {
 		return nil, fmt.Errorf("JWT_TTL inválido: %w", err)
 	}
@@ -65,7 +82,8 @@ func Load() (*Config, error) {
 	cfg := &Config{
 		DatabaseURL:      os.Getenv("DATABASE_URL"),
 		RedisURL:         getEnv("REDIS_URL", "redis://localhost:6379/0"),
-		Port:             getEnv("PORT", "4000"),
+		Port:             getEnv("PORT", DefaultPort),
+		AppEnv:           getEnv("APP_ENV", EnvProduction),
 		CORSOrigin:       getEnv("CORS_ORIGIN", "http://localhost:5175"),
 		NetworkRootEmail: getEnv("NETWORK_ROOT_EMAIL", "cliente@upse.edu.ec"),
 		JWTSecret:        os.Getenv("JWT_SECRET"),

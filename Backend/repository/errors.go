@@ -19,6 +19,9 @@ var (
 	ErrConstraint = errors.New("restricción de datos violada")
 	// ErrInsufficientStock: no hay unidades suficientes para completar la compra (HTTP 409).
 	ErrInsufficientStock = errors.New("stock insuficiente")
+	// ErrInvalidQuantity: la cantidad de una línea es cero o negativa (HTTP 400).
+	// Es un error de entrada, distinto de ErrInsufficientStock (falta de inventario).
+	ErrInvalidQuantity = errors.New("cantidad inválida")
 )
 
 // Códigos SQLSTATE de PostgreSQL que traducimos.
@@ -32,6 +35,9 @@ const (
 // stockConstraint es la restricción que lanza el trigger de inventario
 // (fn_order_items_stock) cuando no hay unidades suficientes.
 const stockConstraint = "ck_products_stock_available"
+
+// quantityConstraint es el CHECK (quantity > 0) de order_items (nombre generado por PostgreSQL).
+const quantityConstraint = "order_items_quantity_check"
 
 // mapError convierte errores del driver en errores del dominio, conservando el original envuelto.
 func mapError(err error) error {
@@ -50,8 +56,11 @@ func mapError(err error) error {
 			return &DomainError{Kind: ErrInvalidRef, Detail: pgErr.ConstraintName}
 		case pgCheckViolation, pgNotNullViolation:
 			// El trigger de inventario usa check_violation con una restricción propia.
-			if pgErr.ConstraintName == stockConstraint {
+			switch pgErr.ConstraintName {
+			case stockConstraint:
 				return &DomainError{Kind: ErrInsufficientStock, Detail: pgErr.Message}
+			case quantityConstraint:
+				return &DomainError{Kind: ErrInvalidQuantity, Detail: pgErr.ConstraintName}
 			}
 			detail := pgErr.ConstraintName
 			if detail == "" {
@@ -68,6 +77,10 @@ func mapError(err error) error {
 type DomainError struct {
 	Kind   error
 	Detail string
+	// Public indica que Detail fue redactado para el usuario ("producto 3") y puede
+	// mostrarse siempre. Si es false (nombres de restricciones o mensajes de PostgreSQL
+	// que arma mapError) solo se expone con APP_ENV=dev.
+	Public bool
 }
 
 func (e *DomainError) Error() string { return e.Kind.Error() + ": " + e.Detail }

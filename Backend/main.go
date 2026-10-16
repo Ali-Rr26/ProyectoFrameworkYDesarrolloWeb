@@ -30,6 +30,12 @@ const shutdownTimeout = 15 * time.Second
 
 // func main es el punto de entrada de la aplicación en Go. Todo comienza a ejecutarse aquí.
 func main() {
+	// Modo sonda para el HEALTHCHECK de Docker: verifica el servidor ya en marcha y termina
+	// (no carga configuración ni abre conexiones).
+	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
+		os.Exit(runHealthcheck())
+	}
+
 	// 1. Configuración desde variables de entorno (.env en desarrollo).
 	cfg, err := config.Load()
 	if err != nil {
@@ -101,6 +107,9 @@ func main() {
 		// Permitimos que el frontend lea X-Cache (HIT/MISS/BYPASS): sin esto CORS la oculta a JavaScript.
 		ExposeHeaders: "X-Cache",
 	}))
+
+	// Detalle técnico de los errores solo en desarrollo (APP_ENV=dev).
+	app.Use(controllers.ErrorDetails(cfg.IsDev()))
 
 	routes.SetupRoutes(app, ctrls)
 

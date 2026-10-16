@@ -56,6 +56,11 @@ func (h *CheckoutController) Checkout(c *fiber.Ctx) error {
 	if fieldErrors := validateOrder(&req); len(fieldErrors) > 0 {
 		return apiError(c, fiber.StatusBadRequest, "Datos de pedido inválidos", fieldErrors)
 	}
+	// La cantidad se valida aparte para devolver su propio mensaje (no se confunde con
+	// "Stock insuficiente") y antes de abrir la transacción.
+	if productID, ok := invalidQuantity(req.Items); ok {
+		return apiError(c, fiber.StatusBadRequest, msgInvalidQuantity, fmt.Sprintf("producto %d", productID))
+	}
 
 	ctx, cancel := context.WithTimeout(c.UserContext(), h.timeout)
 	defer cancel()
@@ -101,11 +106,23 @@ func validateOrder(req *models.CreateOrderRequest) map[string]string {
 		fieldErrors["items"] = "debe incluir al menos un producto"
 	}
 	for i, it := range req.Items {
-		if it.ProductID <= 0 || it.Quantity <= 0 {
-			fieldErrors[fmt.Sprintf("items[%d]", i)] = "product_id y quantity deben ser mayores a 0"
+		if it.ProductID <= 0 {
+			fieldErrors[fmt.Sprintf("items[%d].product_id", i)] = "debe ser mayor que cero"
 		}
 	}
 	return fieldErrors
+}
+
+// invalidQuantity devuelve el primer producto cuya cantidad es cero o negativa.
+// Se revisa cada línea tal como llegó: sumar antes permitiría que una línea negativa
+// "compense" a otra del mismo producto.
+func invalidQuantity(items []models.OrderItemInput) (int, bool) {
+	for _, it := range items {
+		if it.Quantity <= 0 {
+			return it.ProductID, true
+		}
+	}
+	return 0, false
 }
 
 // GetPaymentMethods lista los métodos de pago disponibles (catálogo de la BD).

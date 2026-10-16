@@ -90,7 +90,7 @@ func (r *Repository) CreateProduct(ctx context.Context, in models.ProductInput) 
 		`SELECT id FROM categories WHERE lower(name) = lower($1)`, in.Category,
 	).Scan(&categoryID)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, &DomainError{Kind: ErrInvalidRef, Detail: "categoría inexistente: " + in.Category}
+		return nil, &DomainError{Kind: ErrInvalidRef, Detail: "categoría inexistente: " + in.Category, Public: true}
 	}
 	if err != nil {
 		return nil, err

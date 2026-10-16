@@ -147,6 +147,23 @@ func TestCheckoutRollbackDoesNotPayCommissions(t *testing.T) {
 	}
 }
 
+func TestCheckoutRejectsInvalidQuantityWithOwnMessage(t *testing.T) {
+	for name, qty := range map[string]string{"cero": "0", "negativa": "-3"} {
+		t.Run(name, func(t *testing.T) {
+			f := newCheckoutFixture(&models.Order{ID: 1}, nil)
+
+			body := strings.Replace(validBody, `"quantity":2`, `"quantity":`+qty, 1)
+			status, resp := f.post(t, body)
+			if status != fiber.StatusBadRequest || !strings.Contains(resp, msgInvalidQuantity) {
+				t.Fatalf("status=%d body=%s; se esperaba 400 %q", status, resp, msgInvalidQuantity)
+			}
+			if f.orders.calls != 0 {
+				t.Fatal("con una cantidad inválida no se debe abrir la transacción")
+			}
+		})
+	}
+}
+
 func TestCheckoutRejectsInvalidBodyWithoutTouchingDB(t *testing.T) {
 	f := newCheckoutFixture(&models.Order{ID: 1}, nil)
 
