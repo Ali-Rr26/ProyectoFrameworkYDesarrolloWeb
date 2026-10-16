@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { countNetwork, sumNetworkSales, sumCommissions, getRank, getNodeCommission, type NetworkNode } from '../data/network';
+import { countNetwork, sumNetworkSales, getMonthlyCommissions, getRank, type NetworkNode } from '../data/network';
 import { getNetwork } from '../services/networkService';
 
 const Dashboard = () => {
@@ -23,7 +23,7 @@ const Dashboard = () => {
   const directReferrals = network.children?.length ?? 0;
   const activeReferrals = countNetwork(network);
   const networkSales = sumNetworkSales(network);
-  const monthlyCommissions = sumCommissions(network);
+  const monthlyCommissions = getMonthlyCommissions(network);
   const rank = getRank(directReferrals);
 
   const kpis = [
@@ -74,7 +74,7 @@ const Dashboard = () => {
                 <div className="text-right">
                   <p className="font-bold text-slate-800">${referral.sales.toLocaleString()}</p>
                   <p className="text-xs text-[#20b2aa] font-semibold">
-                    +${getNodeCommission(referral).toFixed(2)}
+                    +${(referral.commission ?? 0).toFixed(2)}
                   </p>
                 </div>
               </div>

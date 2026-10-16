@@ -14,13 +14,24 @@ import (
 	"multicatalogo-backend/repository"
 )
 
+// ProductController atiende el catálogo con Cache-Aside sobre productos:all.
+type ProductController struct {
+	repo  ProductRepository
+	cache cache.Cache
+}
+
+// NewProductController recibe el repositorio y la caché por inyección.
+func NewProductController(repo ProductRepository, c cache.Cache) *ProductController {
+	return &ProductController{repo: repo, cache: c}
+}
+
 // GetProducts devuelve el catálogo completo aplicando Cache-Aside sobre la clave
 // productos:all (TTL 5 min): en un Cache Hit no se consulta PostgreSQL.
-func (h *Handler) GetProducts(c *fiber.Ctx) error {
+func (h *ProductController) GetProducts(c *fiber.Ctx) error {
 	ctx, cancel := dbCtx(c)
 	defer cancel()
 
-	products, status, err := cache.GetOrLoad(ctx, h.rdb, cache.KeyProducts, cache.TTLProducts,
+	products, status, err := cache.GetOrLoad(ctx, h.cache, cache.KeyProducts, cache.TTLProducts,
 		func() ([]models.Product, error) { return h.repo.GetProducts(ctx) })
 	if err != nil {
 		return repoError(c, err)
@@ -31,7 +42,7 @@ func (h *Handler) GetProducts(c *fiber.Ctx) error {
 }
 
 // GetProductByID obtiene un producto específico por su ID.
-func (h *Handler) GetProductByID(c *fiber.Ctx) error {
+func (h *ProductController) GetProductByID(c *fiber.Ctx) error {
 	// Obtenemos el parámetro 'id' de la URL.
 	idParam := c.Params("id")
 
@@ -57,7 +68,7 @@ func (h *Handler) GetProductByID(c *fiber.Ctx) error {
 }
 
 // CreateProduct crea un producto nuevo (solo administrador).
-func (h *Handler) CreateProduct(c *fiber.Ctx) error {
+func (h *ProductController) CreateProduct(c *fiber.Ctx) error {
 	var in models.ProductInput
 	if err := c.BodyParser(&in); err != nil {
 		return apiError(c, fiber.StatusBadRequest, "Cuerpo de petición inválido", nil)
@@ -97,6 +108,6 @@ func (h *Handler) CreateProduct(c *fiber.Ctx) error {
 		return repoError(c, err)
 	}
 	// El catálogo en caché ya no incluye el producto nuevo: se invalida.
-	cache.Delete(h.rdb, cache.KeyProducts)
+	cache.Delete(h.cache, cache.KeyProducts)
 	return c.Status(fiber.StatusCreated).JSON(product)
 }

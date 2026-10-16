@@ -1,8 +1,6 @@
 package controllers
 
 import (
-	"context"
-	"log"
 	"strconv"
 
 	"github.com/gofiber/fiber/v2"
@@ -10,6 +8,19 @@ import (
 	"multicatalogo-backend/cache"
 	"multicatalogo-backend/models"
 )
+
+// NetworkController atiende el árbol de referidos con Cache-Aside sobre red:tree:{email}.
+type NetworkController struct {
+	repo  NetworkRepository
+	cache cache.Cache
+	// rootEmail es la red que ve un admin cuando no envía ?user_id (NETWORK_ROOT_EMAIL).
+	rootEmail string
+}
+
+// NewNetworkController recibe sus dependencias por inyección.
+func NewNetworkController(repo NetworkRepository, c cache.Cache, rootEmail string) *NetworkController {
+	return &NetworkController{repo: repo, cache: c, rootEmail: rootEmail}
+}
 
 // GetNetwork devuelve el árbol de referidos multinivel (requiere JWT), con Cache-Aside
 // sobre la clave red:tree:{email de la raíz} (TTL 10 min).
@@ -19,7 +30,7 @@ import (
 //
 // La clave identifica al árbol (su raíz), no a quien consulta: el cliente y el admin que
 // miran la misma red comparten una sola entrada, y la invalidación siempre la encuentra.
-func (h *Handler) GetNetwork(c *fiber.Ctx) error {
+func (h *NetworkController) GetNetwork(c *fiber.Ctx) error {
 	ctx, cancel := dbCtx(c)
 	defer cancel()
 
@@ -48,7 +59,7 @@ func (h *Handler) GetNetwork(c *fiber.Ctx) error {
 		rootID = func() (int, error) { return id, nil }
 	default:
 		// En un Cache Hit tampoco se busca al usuario raíz por email: se ahorran dos consultas.
-		email = h.cfg.NetworkRootEmail
+		email = h.rootEmail
 		rootID = func() (int, error) {
 			user, err := h.repo.GetUserByEmail(ctx, email)
 			if err != nil {
@@ -59,7 +70,7 @@ func (h *Handler) GetNetwork(c *fiber.Ctx) error {
 	}
 
 	// 2. Cache-Aside sobre el árbol neutro (sin personalizar para quien consulta).
-	tree, status, err := cache.GetOrLoad(ctx, h.rdb, cache.NetworkKey(email), cache.TTLNetwork,
+	tree, status, err := cache.GetOrLoad(ctx, h.cache, cache.NetworkKey(email), cache.TTLNetwork,
 		func() (*models.NetworkNode, error) {
 			id, err := rootID()
 			if err != nil {
@@ -79,20 +90,4 @@ func (h *Handler) GetNetwork(c *fiber.Ctx) error {
 	}
 	c.Set(cache.HeaderName, string(status))
 	return c.JSON(tree)
-}
-
-// invalidateNetwork borra de la caché los árboles en los que aparece userID: el suyo y los
-// de sus patrocinadores hasta MaxNetworkLevel niveles arriba. Se llama tras una escritura
-// ya confirmada, por eso un fallo solo se registra (el TTL acota el dato desactualizado).
-func (h *Handler) invalidateNetwork(ctx context.Context, userID int) {
-	emails, err := h.repo.GetUplineEmails(ctx, userID)
-	if err != nil {
-		log.Printf("cache: no se pudo calcular la red de %d para invalidar: %v", userID, err)
-		return
-	}
-	keys := make([]string, len(emails))
-	for i, e := range emails {
-		keys[i] = cache.NetworkKey(e)
-	}
-	cache.Delete(h.rdb, keys...)
 }

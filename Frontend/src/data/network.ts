@@ -1,4 +1,10 @@
-import { COMMISSION_RATES, RANKS } from './constants';
+import { RANKS } from './constants';
+
+// Saldo de comisiones de la raíz, calculado por el backend (tabla commissions)
+export interface NetworkSummary {
+  commissions_month: number;
+  commissions_total: number;
+}
 
 // Nodo del árbol de referidos tal como lo entrega GET /api/network
 export interface NetworkNode {
@@ -6,6 +12,10 @@ export interface NetworkNode {
   name: string;
   level: number;
   sales: number;
+  // Comisión que las compras de este miembro ya le pagaron a la raíz
+  commission: number;
+  // Solo en la raíz
+  summary?: NetworkSummary;
   children?: NetworkNode[];
 }
 
@@ -21,18 +31,11 @@ export const sumNetworkSales = (root: NetworkNode): number => {
   return directs.reduce((total, child) => total + child.sales + sumNetworkSales(child), 0);
 };
 
-// Comisión que un miembro genera para la raíz según su nivel
-export const getNodeCommission = (node: NetworkNode): number =>
-  node.sales * (COMMISSION_RATES[node.level] ?? 0);
-
-// Suma de las comisiones de toda la red
-export const sumCommissions = (root: NetworkNode): number => {
-  const directs = root.children ?? [];
-  return directs.reduce(
-    (total, child) => total + getNodeCommission(child) + sumCommissions(child),
-    0
-  );
-};
+// Comisiones del mes de la raíz. Ya no se estiman en el navegador: las registra el
+// backend (goroutine tras cada compra) y llegan en summary. Una respuesta antigua en
+// caché puede no traer summary durante unos minutos: se muestra 0.
+export const getMonthlyCommissions = (root: NetworkNode): number =>
+  root.summary?.commissions_month ?? 0;
 
 // Rango alcanzado según la cantidad de referidos directos
 export const getRank = (directReferrals: number): string => {

@@ -5,10 +5,16 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
 	"sort"
+	"time"
 
+	"multicatalogo-backend/config"
 	"multicatalogo-backend/models"
 )
+
+// ErrSimulatedFailure es el error que lanza la falla simulada del checkout (HTTP 500).
+var ErrSimulatedFailure = errors.New("falla simulada: caída del sistema a mitad de la transacción")
 
 // CreateOrder registra un pedido completo de forma ACID dentro de una transacción:
 //  1. verifica que el comprador exista y esté activo,
@@ -17,6 +23,7 @@ import (
 //     descuenta el stock y fija unit_price con el precio vigente de la BD.
 //
 // Si cualquier paso falla se hace ROLLBACK: no queda ni pedido ni stock descontado.
+// Las fallas simuladas (CHECKOUT_FAIL_AT / CHECKOUT_COMMIT_DELAY) se inyectan aquí.
 func (r *Repository) CreateOrder(ctx context.Context, userID int, req models.CreateOrderRequest) (*models.Order, error) {
 	items := mergeItems(req.Items)
 
@@ -55,6 +62,13 @@ func (r *Repository) CreateOrder(ctx context.Context, userID int, req models.Cre
 		return nil, mapError(err)
 	}
 
+	// ===== PUNTO DE FALLA 1 (CHECKOUT_FAIL_AT=after_order) =====
+	// La cabecera ya se insertó en la transacción, pero aún no está confirmada.
+	// Al retornar, el defer tx.Rollback() la deshace: no queda un "pedido fantasma".
+	if r.faults.FailAt == config.FailAfterOrder {
+		return nil, simulatedFailure("tras insertar la cabecera del pedido", order.ID)
+	}
+
 	for _, it := range items {
 		line := models.OrderItem{ProductID: it.ProductID, Quantity: it.Quantity}
 
@@ -73,6 +87,12 @@ func (r *Repository) CreateOrder(ctx context.Context, userID int, req models.Cre
 		order.Items = append(order.Items, line)
 	}
 
+	// ===== PUNTO DE FALLA 2 (CHECKOUT_FAIL_AT=after_items) =====
+	// El trigger ya descontó el stock de cada línea; el ROLLBACK también lo repone.
+	if r.faults.FailAt == config.FailAfterItems {
+		return nil, simulatedFailure("tras insertar las líneas y descontar el stock", order.ID)
+	}
+
 	// El total es un dato derivado: se calcula con la vista, no se almacena.
 	if err := tx.QueryRowContext(ctx,
 		`SELECT total::float8 FROM v_order_totals WHERE order_id = $1`, order.ID,
@@ -80,10 +100,28 @@ func (r *Repository) CreateOrder(ctx context.Context, userID int, req models.Cre
 		return nil, fmt.Errorf("calcular total del pedido: %w", err)
 	}
 
+	// ===== PUNTO DE FALLA 3 (CHECKOUT_COMMIT_DELAY=10s) =====
+	// Pausa antes del COMMIT: da tiempo a ejecutar `docker kill multicatalogo-db`.
+	// Si la conexión se corta, PostgreSQL descarta la transacción al recuperarse.
+	if d := r.faults.CommitDelay; d > 0 {
+		log.Printf("checkout: pedido %d en espera %s antes del COMMIT (demostración)", order.ID, d)
+		select {
+		case <-time.After(d):
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("confirmar pedido: %w", err)
 	}
 	return &order, nil
+}
+
+// simulatedFailure registra la falla inyectada y devuelve ErrSimulatedFailure.
+func simulatedFailure(stage string, orderID int) error {
+	log.Printf("checkout: FALLA SIMULADA %s (pedido %d) -> ROLLBACK", stage, orderID)
+	return ErrSimulatedFailure
 }
 
 // orderItemError traduce el error de una línea del pedido indicando el producto
