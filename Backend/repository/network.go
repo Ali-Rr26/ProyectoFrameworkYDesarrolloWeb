@@ -2,6 +2,8 @@ package repository
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 
 	"multicatalogo-backend/models"
 )
@@ -12,6 +14,7 @@ const MaxNetworkLevel = 3
 // networkQuery recorre la lista de adyacencia network_members desde la raíz ($1).
 //   - level se calcula durante el recorrido (relativo a quien consulta), no se almacena.
 //   - sales sale de la vista v_user_sales (suma de pedidos), no se almacena.
+//   - commission es lo que las compras de cada miembro pagaron a la raíz (tabla commissions).
 //   - CYCLE corta el recorrido si existiera un ciclo (defensa adicional al trigger).
 const networkQuery = `
 	WITH RECURSIVE tree AS (
@@ -28,10 +31,18 @@ const networkQuery = `
 	       u.name,
 	       tree.sponsor_id,
 	       tree.level,
-	       COALESCE(s.sales, 0)::float8
+	       COALESCE(s.sales, 0)::float8,
+	       COALESCE(cm.amount, 0)::float8
 	FROM tree
 	JOIN users u ON u.id = tree.user_id
 	LEFT JOIN v_user_sales s ON s.user_id = tree.user_id
+	LEFT JOIN (
+	    SELECT o.user_id, SUM(c.amount) AS amount
+	    FROM commissions c
+	    JOIN orders o ON o.id = c.order_id
+	    WHERE c.beneficiary_id = $1
+	    GROUP BY o.user_id
+	) cm ON cm.user_id = tree.user_id
 	WHERE NOT tree.is_cycle
 	ORDER BY tree.level, tree.user_id`
 
@@ -41,8 +52,8 @@ type treeNode struct {
 	children []*treeNode
 }
 
-// GetNetwork devuelve el árbol de referidos con raíz en rootUserID, o ErrNotFound si
-// ese usuario no está afiliado a la red.
+// GetNetwork devuelve el árbol de referidos con raíz en rootUserID (con el resumen de
+// comisiones de la raíz), o ErrNotFound si ese usuario no está afiliado a la red.
 func (r *Repository) GetNetwork(ctx context.Context, rootUserID int) (*models.NetworkNode, error) {
 	rows, err := r.db.QueryContext(ctx, networkQuery, rootUserID, MaxNetworkLevel)
 	if err != nil {
@@ -55,7 +66,7 @@ func (r *Repository) GetNetwork(ctx context.Context, rootUserID int) (*models.Ne
 	for rows.Next() {
 		var n treeNode
 		var sponsorID *int
-		if err := rows.Scan(&n.node.ID, &n.node.Name, &sponsorID, &n.node.Level, &n.node.Sales); err != nil {
+		if err := rows.Scan(&n.node.ID, &n.node.Name, &sponsorID, &n.node.Level, &n.node.Sales, &n.node.Commission); err != nil {
 			return nil, err
 		}
 		nodes[n.node.ID] = &n
@@ -75,7 +86,25 @@ func (r *Repository) GetNetwork(ctx context.Context, rootUserID int) (*models.Ne
 	}
 
 	tree := toNetworkNode(root)
+	summary, err := r.getCommissionSummary(ctx, rootUserID)
+	if err != nil {
+		return nil, err
+	}
+	tree.Summary = summary
 	return &tree, nil
+}
+
+// getCommissionSummary lee el saldo de comisiones de un usuario desde la vista
+// v_user_commissions (cero si todavía no ha cobrado ninguna).
+func (r *Repository) getCommissionSummary(ctx context.Context, userID int) (*models.NetworkSummary, error) {
+	var s models.NetworkSummary
+	err := r.db.QueryRowContext(ctx,
+		`SELECT total::float8, month_total::float8 FROM v_user_commissions WHERE user_id = $1`, userID,
+	).Scan(&s.CommissionsTotal, &s.CommissionsMonth)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, mapError(err)
+	}
+	return &s, nil
 }
 
 // toNetworkNode transforma el árbol de punteros en la estructura models.NetworkNode que se serializa.

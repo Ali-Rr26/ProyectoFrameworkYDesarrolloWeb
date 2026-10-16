@@ -1,6 +1,6 @@
 import { apiFetch } from './apiClient';
 
-// Cuerpo de POST /api/orders. El comprador NO se envía: el backend lo toma del JWT,
+// Cuerpo de POST /api/checkout. El comprador NO se envía: el backend lo toma del JWT,
 // y el precio tampoco: se lee de la base de datos.
 export interface CreateOrderPayload {
   payment_method: string;
@@ -19,7 +19,7 @@ export interface CreatedOrder {
 }
 
 export const createOrder = (order: CreateOrderPayload): Promise<CreatedOrder> =>
-  apiFetch<CreatedOrder>('/api/orders', { method: 'POST', body: order });
+  apiFetch<CreatedOrder>('/api/checkout', { method: 'POST', body: order });
 
 // Catálogo de métodos de pago (tabla payment_methods).
 export const getPaymentMethods = (): Promise<string[]> => apiFetch<string[]>('/api/payment-methods');

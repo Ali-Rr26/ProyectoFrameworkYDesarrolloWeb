@@ -13,12 +13,23 @@ import (
 	"multicatalogo-backend/repository"
 )
 
+// AuthController emite tokens a partir de credenciales válidas.
+type AuthController struct {
+	users  CredentialRepository
+	tokens TokenIssuer
+}
+
+// NewAuthController recibe el repositorio y el emisor de tokens por inyección.
+func NewAuthController(users CredentialRepository, tokens TokenIssuer) *AuthController {
+	return &AuthController{users: users, tokens: tokens}
+}
+
 // dummyHash se compara cuando el email no existe, para que el tiempo de respuesta
 // sea similar al de un email válido (evita enumerar cuentas midiendo tiempos).
 var dummyHash, _ = bcrypt.GenerateFromPassword([]byte("dummy-password"), bcrypt.DefaultCost)
 
 // Login valida las credenciales contra la tabla users y devuelve {token, email, role}.
-func (h *Handler) Login(c *fiber.Ctx) error {
+func (h *AuthController) Login(c *fiber.Ctx) error {
 	// Creamos una variable 'req' del tipo LoginRequest (ubicada en nuestro paquete models) para almacenar los datos.
 	var req models.LoginRequest
 
@@ -38,7 +49,7 @@ func (h *Handler) Login(c *fiber.Ctx) error {
 	defer cancel()
 
 	// SELECT parametrizado por email (lower(email) usa el índice único).
-	user, err := h.repo.GetUserByEmail(ctx, req.Email)
+	user, err := h.users.GetUserByEmail(ctx, req.Email)
 	if err != nil && !errors.Is(err, repository.ErrNotFound) {
 		return repoError(c, err)
 	}
@@ -55,7 +66,7 @@ func (h *Handler) Login(c *fiber.Ctx) error {
 	}
 
 	// Emitimos un JWT firmado (HS256) con el ID, email y rol del usuario.
-	token, exp, err := h.jwt.Generate(user.ID, user.Email, user.Role)
+	token, exp, err := h.tokens.Generate(user.ID, user.Email, user.Role)
 	if err != nil {
 		return repoError(c, err)
 	}

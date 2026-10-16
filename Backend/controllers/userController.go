@@ -9,8 +9,19 @@ import (
 	"multicatalogo-backend/models"
 )
 
+// UserController administra cuentas.
+type UserController struct {
+	repo    UserRepository
+	network NetworkInvalidator
+}
+
+// NewUserController recibe sus dependencias por inyección.
+func NewUserController(repo UserRepository, network NetworkInvalidator) *UserController {
+	return &UserController{repo: repo, network: network}
+}
+
 // GetUsers lista las cuentas registradas (solo administrador; nunca expone el hash).
-func (h *Handler) GetUsers(c *fiber.Ctx) error {
+func (h *UserController) GetUsers(c *fiber.Ctx) error {
 	ctx, cancel := dbCtx(c)
 	defer cancel()
 
@@ -22,7 +33,7 @@ func (h *Handler) GetUsers(c *fiber.Ctx) error {
 }
 
 // RegisterUser crea una cuenta de cliente y, opcionalmente, la afilia a la red.
-func (h *Handler) RegisterUser(c *fiber.Ctx) error {
+func (h *UserController) RegisterUser(c *fiber.Ctx) error {
 	var req models.RegisterRequest
 	if err := c.BodyParser(&req); err != nil {
 		return apiError(c, fiber.StatusBadRequest, "Cuerpo de petición inválido", nil)
@@ -54,7 +65,7 @@ func (h *Handler) RegisterUser(c *fiber.Ctx) error {
 	}
 	// Un nuevo afiliado aparece en los árboles de su patrocinador y de los niveles superiores.
 	if req.SponsorID != nil {
-		h.invalidateNetwork(ctx, user.ID)
+		h.network.InvalidateNetwork(ctx, user.ID)
 	}
 	return c.Status(fiber.StatusCreated).JSON(user)
 }
