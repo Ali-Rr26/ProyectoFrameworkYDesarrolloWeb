@@ -1,5 +1,7 @@
-# Levanta PostgreSQL 16 para desarrollo local.
-# Uso: docker compose up -d   (desde la carpeta Backend)
+# Levanta PostgreSQL 16, Redis (caché) y el backend Go.
+# Uso (desde la carpeta Backend):
+#   docker compose up -d --build            -> todo el stack (API en http://localhost:4000)
+#   docker compose up -d postgres redis     -> solo infraestructura, para trabajar con `go run .`
 services:
   postgres:
     image: postgres:16-alpine
@@ -20,6 +22,40 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  redis:
+    image: redis:alpine
+    container_name: multicatalogo-cache
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    # Sin volumen a propósito: es una caché; si se pierde, se reconstruye desde PostgreSQL.
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build: .
+    container_name: multicatalogo-api
+    restart: unless-stopped
+    # JWT_SECRET, JWT_TTL, CORS_ORIGIN, NETWORK_ROOT_EMAIL... salen del mismo .env de desarrollo.
+    env_file: .env
+    # environment tiene prioridad sobre env_file: dentro de Docker los servicios se
+    # alcanzan por su nombre (postgres, redis), no por localhost.
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-multicatalogo}:${POSTGRES_PASSWORD:-multicatalogo}@postgres:5432/${POSTGRES_DB:-multicatalogo}?sslmode=disable
+      REDIS_URL: redis://redis:6379/0
+      PORT: "4000"
+    ports:
+      - "${API_PORT:-4000}:4000"
+    # service_healthy espera a que acepten conexiones, no solo a que el contenedor arranque.
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
 volumes:
   pgdata:

@@ -6,6 +6,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 
+	"multicatalogo-backend/cache"
 	"multicatalogo-backend/models"
 )
 
@@ -58,6 +59,10 @@ func (h *Handler) CreateOrder(c *fiber.Ctx) error {
 	if err != nil {
 		return repoError(c, err)
 	}
+	// El trigger descontó stock y cambiaron las ventas del comprador:
+	// se invalidan el catálogo y los árboles de red donde aparece.
+	cache.Delete(h.rdb, cache.KeyProducts)
+	h.invalidateNetwork(ctx, userID)
 	return c.Status(fiber.StatusCreated).JSON(order)
 }
 

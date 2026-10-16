@@ -52,6 +52,15 @@ func (r *Repository) GetUserByEmail(ctx context.Context, email string) (*models.
 	return &u, nil
 }
 
+// GetUserEmailByID devuelve solo el correo de una cuenta (consulta por PK), o ErrNotFound.
+func (r *Repository) GetUserEmailByID(ctx context.Context, id int) (string, error) {
+	var email string
+	if err := r.db.QueryRowContext(ctx, `SELECT email FROM users WHERE id = $1`, id).Scan(&email); err != nil {
+		return "", mapError(err)
+	}
+	return email, nil
+}
+
 // CreateUser registra un cliente con la contraseña hasheada (bcrypt) y, si trae
 // patrocinador, lo afilia a la red. Ambas inserciones van en una sola transacción:
 // si el patrocinador no existe (FK) tampoco queda creada la cuenta.

@@ -8,20 +8,24 @@ import (
 
 	// Importamos Fiber para manejar la respuesta HTTP.
 	"github.com/gofiber/fiber/v2"
+	"multicatalogo-backend/cache"
 	// Importamos nuestro paquete de modelos para usar la estructura Product.
 	"multicatalogo-backend/models"
 	"multicatalogo-backend/repository"
 )
 
-// GetProducts devuelve el catálogo completo leído desde PostgreSQL.
+// GetProducts devuelve el catálogo completo aplicando Cache-Aside sobre la clave
+// productos:all (TTL 5 min): en un Cache Hit no se consulta PostgreSQL.
 func (h *Handler) GetProducts(c *fiber.Ctx) error {
 	ctx, cancel := dbCtx(c)
 	defer cancel()
 
-	products, err := h.repo.GetProducts(ctx)
+	products, status, err := cache.GetOrLoad(ctx, h.rdb, cache.KeyProducts, cache.TTLProducts,
+		func() ([]models.Product, error) { return h.repo.GetProducts(ctx) })
 	if err != nil {
 		return repoError(c, err)
 	}
+	c.Set(cache.HeaderName, string(status))
 	// Fiber convierte automáticamente el slice de estructuras a formato JSON.
 	return c.JSON(products)
 }
@@ -92,5 +96,7 @@ func (h *Handler) CreateProduct(c *fiber.Ctx) error {
 	if err != nil {
 		return repoError(c, err)
 	}
+	// El catálogo en caché ya no incluye el producto nuevo: se invalida.
+	cache.Delete(h.rdb, cache.KeyProducts)
 	return c.Status(fiber.StatusCreated).JSON(product)
 }

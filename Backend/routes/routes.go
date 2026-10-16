@@ -21,6 +21,7 @@ func SetupRoutes(app *fiber.App, h *controllers.Handler) {
 	// Estado del servidor y de la conexión a PostgreSQL.
 	app.Get("/api/health", controllers.Health)
 	app.Get("/api/health/db", h.HealthDB)
+	app.Get("/api/health/redis", h.HealthRedis)
 
 	// Registro público de clientes (rol customer fijo).
 	app.Post("/api/users", h.RegisterUser)

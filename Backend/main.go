@@ -41,15 +41,22 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// 4. Gestor de tokens JWT (falla si el secreto es demasiado corto).
+	// 4. Cliente de Redis para la caché (si no responde, la API funciona sin caché).
+	rdb, err := config.NewRedisClient(cfg.RedisURL)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer rdb.Close()
+
+	// 5. Gestor de tokens JWT (falla si el secreto es demasiado corto).
 	jwtManager, err := auth.NewManager(cfg.JWTSecret, cfg.JWTTTL)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// 5. Inyección de dependencias: db -> repositorio -> handler -> rutas.
+	// 6. Inyección de dependencias: db -> repositorio -> handler (+ caché) -> rutas.
 	repo := repository.NewRepository(db)
-	handler := controllers.NewHandler(repo, cfg, jwtManager)
+	handler := controllers.NewHandler(repo, rdb, cfg, jwtManager)
 
 	// Instanciamos una nueva aplicación de Fiber y la guardamos en la variable 'app'.
 	app := fiber.New()
@@ -60,11 +67,13 @@ func main() {
 		AllowOrigins: cfg.CORSOrigin,
 		// Declaramos de forma explícita qué cabeceras (Headers) se permitirán en la comunicación.
 		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
+		// Permitimos que el frontend lea X-Cache (HIT/MISS/BYPASS): sin esto CORS la oculta a JavaScript.
+		ExposeHeaders: "X-Cache",
 	}))
 
 	routes.SetupRoutes(app, handler)
 
-	// 6. Cierre ordenado: ante Ctrl+C se dejan de aceptar peticiones y luego se cierra el pool.
+	// 7. Cierre ordenado: ante Ctrl+C se dejan de aceptar peticiones y luego se cierran el pool y Redis.
 	go func() {
 		quit := make(chan os.Signal, 1)
 		signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
@@ -79,5 +88,5 @@ func main() {
 	if err := app.Listen(":" + cfg.Port); err != nil {
 		log.Printf("servidor detenido: %v", err)
 	}
-	log.Println("cerrando conexiones a PostgreSQL")
+	log.Println("cerrando conexiones a PostgreSQL y Redis")
 }
