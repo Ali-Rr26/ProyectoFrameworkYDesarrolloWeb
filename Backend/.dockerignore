@@ -1,0 +1,5 @@
+# Nada de secretos ni binarios locales dentro de la imagen.
+.env
+main.exe
+*.exe
+.git
