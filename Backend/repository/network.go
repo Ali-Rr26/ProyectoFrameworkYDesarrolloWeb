@@ -86,3 +86,43 @@ func toNetworkNode(n *treeNode) models.NetworkNode {
 	}
 	return node
 }
+
+// uplineQuery recorre network_members hacia arriba (hijo -> patrocinador) desde $1.
+// Es la consulta simétrica de networkQuery y toca como máximo MaxNetworkLevel+1 filas por PK.
+const uplineQuery = `
+	WITH RECURSIVE up AS (
+	    SELECT nm.user_id, nm.sponsor_id, 0 AS level
+	    FROM network_members nm
+	    WHERE nm.user_id = $1
+	  UNION ALL
+	    SELECT nm.user_id, nm.sponsor_id, up.level + 1
+	    FROM network_members nm
+	    JOIN up ON nm.user_id = up.sponsor_id
+	    WHERE up.level < $2
+	) CYCLE user_id SET is_cycle USING path
+	SELECT u.email
+	FROM up
+	JOIN users u ON u.id = up.user_id
+	WHERE NOT up.is_cycle`
+
+// GetUplineEmails devuelve el email de userID y de sus patrocinadores hasta MaxNetworkLevel
+// niveles arriba: son las raíces de todos los árboles en los que aparece userID, es decir,
+// los árboles cuya caché queda obsoleta cuando cambian sus ventas o se afilia a la red.
+// Si userID no está afiliado devuelve un slice vacío.
+func (r *Repository) GetUplineEmails(ctx context.Context, userID int) ([]string, error) {
+	rows, err := r.db.QueryContext(ctx, uplineQuery, userID, MaxNetworkLevel)
+	if err != nil {
+		return nil, mapError(err)
+	}
+	defer rows.Close()
+
+	emails := []string{}
+	for rows.Next() {
+		var email string
+		if err := rows.Scan(&email); err != nil {
+			return nil, err
+		}
+		emails = append(emails, email)
+	}
+	return emails, rows.Err()
+}
