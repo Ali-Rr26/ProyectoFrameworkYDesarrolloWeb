@@ -14,7 +14,7 @@ const MaxNetworkLevel = 3
 // networkQuery recorre la lista de adyacencia network_members desde la raíz ($1).
 //   - level se calcula durante el recorrido (relativo a quien consulta), no se almacena.
 //   - sales sale de la vista v_user_sales (suma de pedidos), no se almacena.
-//   - commission es lo que las compras de cada miembro pagaron a la raíz (tabla commissions).
+//   - commission es lo que las compras de cada miembro pagaron a la raíz (tabla commissions, sin revertidas).
 //   - CYCLE corta el recorrido si existiera un ciclo (defensa adicional al trigger).
 const networkQuery = `
 	WITH RECURSIVE tree AS (
@@ -40,7 +40,7 @@ const networkQuery = `
 	    SELECT o.user_id, SUM(c.amount) AS amount
 	    FROM commissions c
 	    JOIN orders o ON o.id = c.order_id
-	    WHERE c.beneficiary_id = $1
+	    WHERE c.beneficiary_id = $1 AND c.status <> 'reversed'
 	    GROUP BY o.user_id
 	) cm ON cm.user_id = tree.user_id
 	WHERE NOT tree.is_cycle

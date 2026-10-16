@@ -132,12 +132,14 @@ func simulatedFailure(stage string, orderID int) error {
 }
 
 // orderItemError traduce el error de una línea del pedido indicando el producto
-// afectado: stock insuficiente (409) o producto inexistente (422).
+// afectado: stock insuficiente (409), producto dado de baja o inexistente (422).
 func orderItemError(err error, productID int) error {
 	mapped := mapError(err)
 	switch {
 	case errors.Is(mapped, ErrInsufficientStock):
 		return &DomainError{Kind: ErrInsufficientStock, Detail: fmt.Sprintf("producto %d", productID), Public: true}
+	case errors.Is(mapped, ErrProductInactive):
+		return &DomainError{Kind: ErrProductInactive, Detail: fmt.Sprintf("producto %d", productID), Public: true}
 	case errors.Is(mapped, ErrInvalidRef):
 		return &DomainError{Kind: ErrInvalidRef, Detail: fmt.Sprintf("producto %d inexistente", productID), Public: true}
 	default:

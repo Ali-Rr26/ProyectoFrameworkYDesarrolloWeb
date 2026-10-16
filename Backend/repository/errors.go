@@ -22,6 +22,8 @@ var (
 	// ErrInvalidQuantity: la cantidad de una línea es cero o negativa (HTTP 400).
 	// Es un error de entrada, distinto de ErrInsufficientStock (falta de inventario).
 	ErrInvalidQuantity = errors.New("cantidad inválida")
+	// ErrProductInactive: el producto fue dado de baja y ya no se vende (HTTP 422).
+	ErrProductInactive = errors.New("producto no disponible")
 )
 
 // Códigos SQLSTATE de PostgreSQL que traducimos.
@@ -38,6 +40,10 @@ const stockConstraint = "ck_products_stock_available"
 
 // quantityConstraint es el CHECK (quantity > 0) de order_items (nombre generado por PostgreSQL).
 const quantityConstraint = "order_items_quantity_check"
+
+// inactiveProductConstraint es la restricción que lanza el trigger de inventario
+// cuando se intenta vender un producto dado de baja (migración 0004).
+const inactiveProductConstraint = "ck_products_active"
 
 // mapError convierte errores del driver en errores del dominio, conservando el original envuelto.
 func mapError(err error) error {
@@ -61,6 +67,8 @@ func mapError(err error) error {
 				return &DomainError{Kind: ErrInsufficientStock, Detail: pgErr.Message}
 			case quantityConstraint:
 				return &DomainError{Kind: ErrInvalidQuantity, Detail: pgErr.ConstraintName}
+			case inactiveProductConstraint:
+				return &DomainError{Kind: ErrProductInactive, Detail: pgErr.Message}
 			}
 			detail := pgErr.ConstraintName
 			if detail == "" {

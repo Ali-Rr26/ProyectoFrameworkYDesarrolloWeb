@@ -58,3 +58,12 @@ func TestRepoErrorInvalidQuantityIsBadRequest(t *testing.T) {
 		t.Fatalf("got=%+v; se esperaba 400 %q", got, msgInvalidQuantity)
 	}
 }
+
+func TestRepoErrorInactiveProductIsUnprocessable(t *testing.T) {
+	err := &repository.DomainError{Kind: repository.ErrProductInactive, Detail: "producto 4", Public: true}
+
+	got := errorResponse(t, false, err)
+	if got.Status != fiber.StatusUnprocessableEntity || got.Message != "Producto no disponible" || got.Details != "producto 4" {
+		t.Fatalf("got=%+v; se esperaba 422 \"Producto no disponible\" con el producto", got)
+	}
+}
