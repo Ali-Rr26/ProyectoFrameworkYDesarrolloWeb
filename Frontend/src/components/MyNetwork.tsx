@@ -33,7 +33,7 @@ const NetworkNodeItem = ({ node }: { node: NetworkNode }) => {
 
       {/* Hijos del referido (más profundidad en el árbol) */}
       {node.children && node.children.length > 0 && (
-        <ul className="mt-3 ml-6 space-y-3 border-l-2 border-slate-200 pl-4">
+        <ul className="mt-3 ml-3 sm:ml-6 space-y-3 border-l-2 border-slate-200 pl-3 sm:pl-4">
           {node.children.map((child) => (
             <NetworkNodeItem key={child.id} node={child} />
           ))}

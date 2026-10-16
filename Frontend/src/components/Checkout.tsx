@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useCart } from '../context/CartContext';
+import { useCart } from '../context/cart';
 import { createOrder, getPaymentMethods } from '../services/orderService';
 import { ApiError } from '../services/apiClient';
 import type { ConfirmedOrder } from './Confirmation';

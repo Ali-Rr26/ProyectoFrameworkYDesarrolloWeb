@@ -11,7 +11,8 @@ import Checkout from './components/Checkout';
 import Confirmation from './components/Confirmation';
 import Login from './components/Login';
 import { CartProvider } from './context/CartContext';
-import { AuthProvider, useAuth } from './context/AuthContext';
+import { AuthProvider } from './context/AuthContext';
+import { useAuth } from './context/auth';
 
 // Componente para proteger las rutas privadas: exige estar autenticado
 const ProtectedRoute = () => {

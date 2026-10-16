@@ -1,7 +1,7 @@
 // src/components/Login.tsx
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/auth';
 import { apiFetch, ApiError } from '../services/apiClient';
 
 // Respuesta de POST /api/login

@@ -1,30 +1,16 @@
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { setAuthToken, setUnauthorizedHandler } from '../services/apiClient';
+import { AuthContext, type User } from './auth';
 
-// 1. Tipos de rol que maneja la aplicación
-export type Role = 'admin' | 'customer';
-
-// 2. Usuario autenticado: correo + rol (lo entrega la API en /api/login)
-export interface User {
-  email: string;
-  role: Role;
-}
-
-// 3. Sesión completa: usuario + JWT + fecha de expiración del token
+// 1. Sesión completa: usuario + JWT + fecha de expiración del token
+// (tipos Role/User, contexto y hook useAuth en ./auth)
 interface Session {
   user: User;
   token: string;
   expiresAt: string;
 }
 
-interface AuthContextType {
-  isAuthenticated: boolean;
-  user: User | null;
-  login: (user: User, token: string, expiresAt: string) => void;
-  logout: () => void;
-}
-
-// 4. La sesión se guarda en sessionStorage: sobrevive a recargar la página pero se
+// 2. La sesión se guarda en sessionStorage: sobrevive a recargar la página pero se
 // borra al cerrar la pestaña (menor exposición del token que localStorage).
 const SESSION_KEY = 'multicatalogo_session';
 
@@ -42,16 +28,6 @@ const readSession = (): Session | null => {
   } catch {
     return null;
   }
-};
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error("useAuth debe ser usado dentro de un AuthProvider");
-  }
-  return context;
 };
 
 interface AuthProviderProps {
