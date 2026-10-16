@@ -63,18 +63,18 @@ vínculo usuario ↔ red con FK real `network_members.sponsor_id` + trigger anti
 (antes: `usuarios.referido_id`); `orders.user_id` (antes: `pedidos.usuario_id`); ledger
 `commissions` con tasas `commission_rates` (antes: `comisiones`).
 
-- [ ] `network_members.referral_code VARCHAR(20) UNIQUE NOT NULL` + códigos para el seed (antes: `referidos.codigo`)
-- [ ] `products.active BOOLEAN NOT NULL DEFAULT TRUE` (baja lógica) (antes: `productos.activo`)
-- [ ] `orders.status VARCHAR(20) NOT NULL DEFAULT 'pending'` con CHECK (`pending`, `preparing`, `shipped`, `delivered`, `cancelled`) + índice `(status, created_at)` (antes: `pedidos.estado`)
-- [ ] `commissions.status` (`pending`, `paid`, `reversed`; defecto `pending`) + `commissions.payout_id`
-- [ ] Tabla `payouts(id, beneficiary_id, total, created_at)` (antes: `liquidaciones`)
-- [ ] `v_user_commissions` excluye comisiones `reversed`
-- [ ] Trigger `fn_order_items_stock` rechaza productos inactivos (no se pueden vender tras la baja)
+- [x] `network_members.referral_code VARCHAR(20) UNIQUE NOT NULL` + códigos para el seed (antes: `referidos.codigo`); trigger `trg_network_referral_code` lo genera solo al afiliar
+- [x] `products.active BOOLEAN NOT NULL DEFAULT TRUE` (baja lógica) (antes: `productos.activo`)
+- [x] `orders.status VARCHAR(20) NOT NULL DEFAULT 'pending'` con CHECK (`pending`, `preparing`, `shipped`, `delivered`, `cancelled`) + índice `(status, created_at)` (antes: `pedidos.estado`); los pedidos previos quedan `delivered`
+- [x] `commissions.status` (`pending`, `paid`, `reversed`; defecto `pending`) + `commissions.payout_id`
+- [x] Tabla `payouts(id, beneficiary_id, total, created_at)` (antes: `liquidaciones`)
+- [x] `v_user_commissions` excluye comisiones `reversed` (también la comisión por nodo de `GET /api/network`)
+- [x] Trigger `fn_order_items_stock` rechaza productos inactivos (no se pueden vender tras la baja) → API 422 "Producto no disponible" (`ErrProductInactive`)
 
 **Verificación**
 
-- [ ] `\d orders`, `\d commissions`, `\d payouts` muestran las columnas; `SELECT count(*) FROM network_members WHERE referral_code IS NULL` → 0
-- [ ] El backend arranca y registra `migración aplicada: 0004_backoffice`
+- [x] `\d orders`, `\d commissions`, `\d payouts` muestran las columnas; `SELECT count(*) FROM network_members WHERE referral_code IS NULL` → 0
+- [x] El backend arranca y registra `migración aplicada: 0004_backoffice`
 
 ---
 
@@ -264,7 +264,7 @@ errores por campo.
 | Fase | Entregable | Estado |
 |---|---|---|
 | 0 | Brechas del sílabo: `VITE_API_URL`, lint 0, touch 44px, health con deps + healthcheck, `JWT_TTL` 2h, `APP_ENV`, `ErrInvalidQuantity` | 🟡 Implementada y verificada — falta la auditoría visual a 375px |
-| 1 | Migración `0004_backoffice.sql` | ⏳ Pendiente |
+| 1 | Migración `0004_backoffice.sql` | ✅ Implementada y verificada |
 | 2 | Registro con código de referido + admin de usuarios + vistas | ⏳ Pendiente (base: `POST /api/users`) |
 | 3 | CRUD productos (edición + baja lógica) | ⏳ Pendiente (base: `POST /api/products`) |
 | 4 | Pedidos: consulta, estados, cancelación ACID | ⏳ Pendiente |

@@ -96,6 +96,7 @@ Capas: `routes` → `controllers` (structs con interfaces de `ports.go`) → `se
 | `database/migrations/0001_schema.sql` | Esquema 3FN: `roles`, `users`, `network_members` (+ trigger anticiclos), `categories`, `products`, `product_images`, `payment_methods`, `orders`, `order_items` (+ trigger de stock `fn_order_items_stock`), vistas `v_order_totals`, `v_user_sales`; pgcrypto. |
 | `database/migrations/0002_seed.sql` | Seed: 9 usuarios (contraseña `123456`, bcrypt vía `crypt()`), red, productos, pedidos. |
 | `database/migrations/0003_commissions.sql` | `commission_rates` (10/5/2 %), ledger `commissions` (`UNIQUE(order_id, level)`), vista `v_user_commissions`, comisiones del seed. |
+| `database/migrations/0004_backoffice.sql` | Base del back-office: `network_members.referral_code` (generado por trigger), `products.active` (baja lógica; el trigger de stock rechaza inactivos), `orders.status` (`pending`…`cancelled`), `commissions.status` + `payout_id`, tabla `payouts`; `v_user_commissions` excluye revertidas. |
 | `models/models.go` | `LoginRequest`, `Product`, `ProductInput`, `User` (hash con `json:"-"`), `RegisterRequest`, `NetworkNode`/`NetworkSummary`, `CreateOrderRequest`/`OrderItemInput`, `Order`/`OrderItem`, `PendingCommission`, `APIError`. |
 | `routes/routes.go` | `SetupRoutes(app, Controllers)`; middleware por ruta (públicas nunca pasan por auth). |
 | `controllers/ports.go` | Interfaces por consumidor: `ProductRepository`, `NetworkRepository`, `OrderRepository`, `UserRepository`, `CredentialRepository`, `Pinger`, `TokenIssuer`, `TokenParser`, `NetworkInvalidator`, `CommissionProcessor`. |
@@ -107,7 +108,7 @@ Capas: `routes` → `controllers` (structs con interfaces de `ports.go`) → `se
 | `controllers/checkoutController.go` | `POST /api/checkout` (+ alias `/api/orders`) y `GET /api/payment-methods`; comprador del JWT; cantidad ≤0 → 400 propio; tras COMMIT invalida caché y lanza comisiones. |
 | `controllers/userController.go` | `POST /api/users` (registro público, `sponsor_id` opcional) y `GET /api/users` (admin). |
 | `controllers/healthController.go` | `GET /api/health` (ping a ambas dependencias: `ok`, `degraded` si cae Redis, 503 si cae PostgreSQL), `/api/health/db` y `/api/health/redis` (503 si cae). |
-| `repository/` | Única capa con SQL: `products.go`, `users.go`, `network.go` (árbol `WITH RECURSIVE` + upline), `orders.go` (transacción ACID + fallas simuladas), `commissions.go` (inserción recursiva idempotente + pendientes), `catalogs.go`, `errors.go` (SQLSTATE → `ErrNotFound`, `ErrDuplicate`, `ErrInvalidRef`, `ErrConstraint`, `ErrInsufficientStock`, `ErrInvalidQuantity`; `DomainError.Public` marca el detalle apto para el usuario). |
+| `repository/` | Única capa con SQL: `products.go`, `users.go`, `network.go` (árbol `WITH RECURSIVE` + upline; comisiones sin revertidas), `orders.go` (transacción ACID + fallas simuladas), `commissions.go` (inserción recursiva idempotente + pendientes), `catalogs.go`, `errors.go` (SQLSTATE → `ErrNotFound`, `ErrDuplicate`, `ErrInvalidRef`, `ErrConstraint`, `ErrInsufficientStock`, `ErrInvalidQuantity`, `ErrProductInactive`; `DomainError.Public` marca el detalle apto para el usuario). |
 | `services/commissions.go` | `CommissionService`: `ProcessAsync` (goroutine con contexto propio, recover), `RecoverPending`, `Shutdown` (WaitGroup). |
 | `services/network_cache.go` | `NetworkCacheInvalidator`: borra `red:tree:*` del usuario y su upline (3 niveles). |
 | `cache/cache.go`, `cache/redis.go` | Interfaz `Cache` + `GetOrLoad` genérico (HIT/MISS/BYPASS en `X-Cache`) + `Delete`; `RedisCache` la implementa. |
@@ -131,8 +132,8 @@ Capas: `routes` → `controllers` (structs con interfaces de `ports.go`) → `se
 ## Datos y contratos clave
 
 - Errores: siempre `{"status": N, "message": "...", "details"?}` (`APIError`); los detalles técnicos solo con `APP_ENV=dev`.
-- Checkout: `{payment_method, shipping_address, city, phone, items: [{product_id, quantity}]}`; el comprador sale del JWT, el precio y el total los calcula el servidor; cantidad ≤0 → 400 "cantidad debe ser mayor que cero", stock insuficiente → 409, producto/método inexistente → 422.
-- Comisiones: nivel 1 = 10 %, 2 = 5 %, 3 = 2 % del total del pedido, al patrocinador correspondiente; una fila por `(order_id, level)` en `commissions`.
+- Checkout: `{payment_method, shipping_address, city, phone, items: [{product_id, quantity}]}`; el comprador sale del JWT, el precio y el total los calcula el servidor; cantidad ≤0 → 400 "cantidad debe ser mayor que cero", stock insuficiente → 409, producto dado de baja → 422 "Producto no disponible", producto/método inexistente → 422. Los pedidos nacen en `pending`.
+- Comisiones: nivel 1 = 10 %, 2 = 5 %, 3 = 2 % del total del pedido, al patrocinador correspondiente; una fila por `(order_id, level)` en `commissions`, con estado `pending` / `paid` (con `payout_id`) / `reversed`.
 - Cuentas demo (contraseña `123456`): `admin@upse.edu.ec` (admin), `cliente@upse.edu.ec` (raíz de la red) y 7 miembros `@multicatalogo.ec` (`diana.paz` es nivel 3).
 
 ## Notas operativas
@@ -141,4 +142,4 @@ Capas: `routes` → `controllers` (structs con interfaces de `ports.go`) → `se
 - Caché: `productos:all` (5 min) y `red:tree:{email}` (10 min); sin Redis la API responde desde PostgreSQL (`X-Cache: BYPASS`). Checkout y alta de producto/usuario invalidan las claves afectadas.
 - Demostración del ROLLBACK: `CHECKOUT_FAIL_AT=after_order|after_items` o `CHECKOUT_COMMIT_DELAY=10s` + `docker kill multicatalogo-db`. Desactivadas por defecto; nunca fuera de clase.
 - Seguridad vigente: bcrypt, JWT HS256 (2h por defecto), rutas protegidas por rol, errores sanitizados fuera de desarrollo, identidad del comprador desde el token, cuentas inactivas rechazadas en login y checkout.
-- Brechas abiertas (ver checklist y plan): verificación visual a 375px y back-office (fases 1–8 del plan).
+- Brechas abiertas (ver checklist y plan): verificación visual a 375px y back-office (fases 2–8 del plan).
