@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/redis/go-redis/v9"
 
 	"multicatalogo-backend/auth"
 	"multicatalogo-backend/config"
@@ -22,13 +23,15 @@ const dbTimeout = 5 * time.Second
 // Handler agrupa las dependencias de los controladores (inyectadas desde main).
 type Handler struct {
 	repo *repository.Repository
+	rdb  *redis.Client
 	cfg  *config.Config
 	jwt  *auth.Manager
 }
 
-// NewHandler construye el Handler con el repositorio, la configuración y el gestor de tokens.
-func NewHandler(repo *repository.Repository, cfg *config.Config, jwt *auth.Manager) *Handler {
-	return &Handler{repo: repo, cfg: cfg, jwt: jwt}
+// NewHandler construye el Handler con el repositorio, el cliente de Redis (caché),
+// la configuración y el gestor de tokens.
+func NewHandler(repo *repository.Repository, rdb *redis.Client, cfg *config.Config, jwt *auth.Manager) *Handler {
+	return &Handler{repo: repo, rdb: rdb, cfg: cfg, jwt: jwt}
 }
 
 // dbCtx crea un contexto con límite de tiempo derivado de la petición HTTP.
