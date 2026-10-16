@@ -27,7 +27,21 @@ type Config struct {
 	JWTSecret string
 	// JWTTTL es la vigencia de cada token emitido.
 	JWTTTL time.Duration
+	// CheckoutFailAt activa una falla simulada en la transacción del checkout para
+	// demostrar el ROLLBACK en clase ("" desactivada, "after_order" o "after_items").
+	CheckoutFailAt string
+	// CheckoutCommitDelay pausa la transacción justo antes del COMMIT para poder
+	// detener el contenedor de PostgreSQL a mitad de la compra (0 desactivada).
+	CheckoutCommitDelay time.Duration
 }
+
+// Etapas válidas de CHECKOUT_FAIL_AT.
+const (
+	// FailAfterOrder falla después de insertar la cabecera del pedido.
+	FailAfterOrder = "after_order"
+	// FailAfterItems falla después de insertar las líneas (el stock ya se descontó).
+	FailAfterItems = "after_items"
+)
 
 // Load lee el archivo .env (si existe) y las variables de entorno, aplicando valores por defecto.
 func Load() (*Config, error) {
@@ -39,6 +53,15 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("JWT_TTL inválido: %w", err)
 	}
 
+	commitDelay, err := time.ParseDuration(getEnv("CHECKOUT_COMMIT_DELAY", "0s"))
+	if err != nil || commitDelay < 0 {
+		return nil, fmt.Errorf("CHECKOUT_COMMIT_DELAY inválido: %q", os.Getenv("CHECKOUT_COMMIT_DELAY"))
+	}
+	failAt := os.Getenv("CHECKOUT_FAIL_AT")
+	if failAt != "" && failAt != FailAfterOrder && failAt != FailAfterItems {
+		return nil, fmt.Errorf("CHECKOUT_FAIL_AT inválido: %q (use %s o %s)", failAt, FailAfterOrder, FailAfterItems)
+	}
+
 	cfg := &Config{
 		DatabaseURL:      os.Getenv("DATABASE_URL"),
 		RedisURL:         getEnv("REDIS_URL", "redis://localhost:6379/0"),
@@ -47,6 +70,9 @@ func Load() (*Config, error) {
 		NetworkRootEmail: getEnv("NETWORK_ROOT_EMAIL", "cliente@upse.edu.ec"),
 		JWTSecret:        os.Getenv("JWT_SECRET"),
 		JWTTTL:           ttl,
+
+		CheckoutFailAt:      failAt,
+		CheckoutCommitDelay: commitDelay,
 	}
 
 	// Sin base de datos ni secreto JWT la aplicación no puede funcionar: fallamos al arrancar.

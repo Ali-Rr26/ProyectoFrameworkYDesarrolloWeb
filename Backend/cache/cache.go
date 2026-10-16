@@ -9,8 +9,6 @@ import (
 	"log"
 	"strings"
 	"time"
-
-	"github.com/redis/go-redis/v9"
 )
 
 // Claves y tiempos de expiración definidos por el DRS de la Fase 3.
@@ -24,6 +22,23 @@ const (
 	// TTLNetwork es la vigencia del árbol: la consulta recursiva es la más costosa.
 	TTLNetwork = 10 * time.Minute
 )
+
+// Cache es el contrato que los controladores necesitan de un almacén clave-valor
+// (el "CacheRepository" del DRS). RedisCache lo implementa sobre Redis; los tests
+// usan una implementación en memoria sin levantar ningún servidor.
+type Cache interface {
+	// Get devuelve el valor guardado o ErrMiss si la clave no existe.
+	Get(ctx context.Context, key string) ([]byte, error)
+	// Set guarda el valor con un tiempo de expiración.
+	Set(ctx context.Context, key string, value []byte, ttl time.Duration) error
+	// Del borra las claves indicadas (las inexistentes se ignoran).
+	Del(ctx context.Context, keys ...string) error
+	// Ping verifica que el almacén responda (health check).
+	Ping(ctx context.Context) error
+}
+
+// ErrMiss indica que la clave no existe en la caché (Cache Miss).
+var ErrMiss = errors.New("cache: clave inexistente")
 
 // HeaderName es la cabecera con la que se informa al cliente el origen de la respuesta.
 const HeaderName = "X-Cache"
@@ -52,19 +67,20 @@ func NetworkKey(email string) string {
 }
 
 // GetOrLoad implementa Cache-Aside:
-//  1. intenta leer key desde Redis (Hit: deserializa y retorna sin tocar la BD);
+//  1. intenta leer key desde la caché (Hit: deserializa y retorna sin tocar la BD);
 //  2. si no existe (Miss), ejecuta load, serializa el resultado a JSON y lo guarda con ttl;
-//  3. si Redis falla (Bypass), ejecuta load sin guardar: la caché nunca tumba la API.
+//  3. si la caché falla (Bypass), ejecuta load sin guardar: la caché nunca tumba la API.
 //
 // Si load falla no se guarda nada (los errores no se cachean) y el error se devuelve tal cual.
-func GetOrLoad[T any](ctx context.Context, rdb *redis.Client, key string, ttl time.Duration, load func() (T, error)) (T, Status, error) {
-	if rdb == nil {
+// Es una función y no un método de Cache porque en Go los métodos no admiten parámetros de tipo.
+func GetOrLoad[T any](ctx context.Context, c Cache, key string, ttl time.Duration, load func() (T, error)) (T, Status, error) {
+	if c == nil {
 		v, err := load()
 		return v, Bypass, err
 	}
 
 	getCtx, cancel := context.WithTimeout(ctx, opTimeout)
-	data, err := rdb.Get(getCtx, key).Bytes()
+	data, err := c.Get(getCtx, key)
 	cancel()
 	switch {
 	case err == nil:
@@ -74,7 +90,7 @@ func GetOrLoad[T any](ctx context.Context, rdb *redis.Client, key string, ttl ti
 		}
 		// Contenido corrupto o de una versión anterior del modelo: se reconstruye.
 		log.Printf("cache: valor inválido en %s, se recarga desde la BD", key)
-	case errors.Is(err, redis.Nil):
+	case errors.Is(err, ErrMiss):
 		// La clave no existe: Cache Miss normal.
 	default:
 		// Redis caído o lento: se sirve desde la BD sin intentar guardar.
@@ -94,7 +110,7 @@ func GetOrLoad[T any](ctx context.Context, rdb *redis.Client, key string, ttl ti
 	}
 	setCtx, cancel := context.WithTimeout(ctx, opTimeout)
 	defer cancel()
-	if err := rdb.Set(setCtx, key, payload, ttl).Err(); err != nil {
+	if err := c.Set(setCtx, key, payload, ttl); err != nil {
 		log.Printf("cache: SET %s falló: %v", key, err)
 		return v, Bypass, nil
 	}
@@ -104,13 +120,13 @@ func GetOrLoad[T any](ctx context.Context, rdb *redis.Client, key string, ttl ti
 // Delete invalida las claves indicadas tras una escritura confirmada en PostgreSQL.
 // Usa su propio contexto para borrar aunque el cliente HTTP ya haya cortado la conexión.
 // Los errores solo se registran: la escritura ya se confirmó y el TTL acota el dato viejo.
-func Delete(rdb *redis.Client, keys ...string) {
-	if rdb == nil || len(keys) == 0 {
+func Delete(c Cache, keys ...string) {
+	if c == nil || len(keys) == 0 {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), opTimeout)
 	defer cancel()
-	if err := rdb.Del(ctx, keys...).Err(); err != nil {
+	if err := c.Del(ctx, keys...); err != nil {
 		log.Printf("cache: DEL %v falló: %v", keys, err)
 	}
 }
