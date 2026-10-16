@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
-import { countNetwork, sumNetworkSales, sumCommissions, getRank, getNodeCommission, type NetworkNode } from '../data/network';
+import { countNetwork, sumNetworkSales, getMonthlyCommissions, getRank, type NetworkNode } from '../data/network';
 import { getNetwork } from '../services/networkService';
 import { COMMISSION_RATES, LEVEL_STYLES } from '../data/constants';
 
 // Componente recursivo: renderiza un referido y, debajo, a sus hijos
 const NetworkNodeItem = ({ node }: { node: NetworkNode }) => {
   const style = LEVEL_STYLES[node.level] ?? LEVEL_STYLES[1];
-  const commission = getNodeCommission(node);
+  const commission = node.commission ?? 0;
 
   return (
     <li>
@@ -64,7 +64,7 @@ const MyNetwork = () => {
   // KPIs derivados de los datos de la red (funciones puras en data/network.ts)
   const activeReferrals = countNetwork(network);
   const networkSales = sumNetworkSales(network);
-  const monthlyCommissions = sumCommissions(network);
+  const monthlyCommissions = getMonthlyCommissions(network);
   const rank = getRank(network.children?.length ?? 0);
 
   const summary = [
