@@ -53,7 +53,7 @@ React SPA (:5173) ──► Caddy/Nginx (U4: proxy inverso + SSL)
 
 - [x] Entorno SPA con Vite + Tailwind CSS
 - [x] `package.json` renombrado a `multicatalogo-frontend`
-- [ ] `VITE_API_URL` en `.env` + `import.meta.env` (cliente único en `services/apiClient.ts`)
+- [x] `VITE_API_URL` en `.env` + `import.meta.env` (cliente único en `services/apiClient.ts`)
 
 ## U1-T3 · Componentes y gestión de estado global
 
@@ -61,7 +61,7 @@ React SPA (:5173) ──► Caddy/Nginx (U4: proxy inverso + SSL)
 
 - [x] `AuthContext` (sesión `{email, role}`) y `CartContext` (carrito en localStorage por email)
 - [x] Persistencia de sesión en `AuthContext` (`multicatalogo_session`: usuario + JWT en sessionStorage)
-- [ ] Warnings eslint resueltos: split `context/auth.ts` + `context/cart.ts` (hooks/tipos separados del Provider); `npm run lint` → 0 errores, 0 warnings
+- [x] Warnings eslint resueltos: split `context/auth.ts` + `context/cart.ts` (hooks/tipos separados del Provider); `npm run lint` → 0 errores, 0 warnings
 
 ## U1-T4 · Consumo de API RESTful y enrutamiento
 
@@ -78,7 +78,7 @@ React SPA (:5173) ──► Caddy/Nginx (U4: proxy inverso + SSL)
 - [x] F1 Storefront `/store` full-screen | F3 Catálogo con búsqueda/filtros | F2 Detalle `/product/:id` | F4 Lightbox
 - [x] F5 Carrito + checkout + confirmación | F6 Árbol multinivel comisiones 10/5/2 % | F7 Dashboard KPIs
 - [x] `Checkout.tsx` → `POST /api/checkout` real (sin simulación) + manejo de `ApiError`
-- [ ] Audit mobile-first: 375px sin overflow en Dashboard/MyNetwork/Catalog; botones de acción ≥44px (`Añadir al Carrito`, steppers de `Cart`, `Cerrar Sesión`)
+- [ ] Audit mobile-first: 375px sin overflow en Dashboard/MyNetwork/Catalog; botones de acción ≥44px (`Añadir al Carrito`, steppers de `Cart`, `Cerrar Sesión`) — botones ≥44px listos; falta la verificación visual a 375px
 
 ---
 
@@ -97,7 +97,7 @@ React SPA (:5173) ──► Caddy/Nginx (U4: proxy inverso + SSL)
 - [x] Capas routes → controllers → repository; endpoints login/products/network/health
 - [x] `APIError{status,message,details}` en todos los errores + validación de entrada (400/404)
 - [-] Puerto de escucha configurable (`PORT`, defecto 3000) — descartado: el 3000 está ocupado por otro proyecto; `PORT` es configurable y el defecto se mantiene en 4000
-- [ ] `/api/health` real: `HealthController` con ping a Postgres (503 si cae) y Redis (`"degraded"` si cae)
+- [x] `/api/health` real: `HealthController` con ping a Postgres (503 si cae) y Redis (`"degraded"` si cae)
 
 ## U2-T3 · Persistencia PostgreSQL + caché Redis
 
@@ -117,9 +117,9 @@ React SPA (:5173) ──► Caddy/Nginx (U4: proxy inverso + SSL)
 - [x] `POST /api/checkout` ACID: trigger `fn_order_items_stock` (`UPDATE … WHERE stock >= cantidad`) + descuento de stock + `orders`/`order_items`, ROLLBACK → 409/422/500, total recalculado en servidor
 - [x] Invalidación de caché tras compra (`productos:all`, `red:tree:*`) + tablas de checkout en `0001_schema.sql`
 - [x] bcrypt de passwords (pgcrypto `crypt()/gen_salt('bf')` en `0001_schema.sql` + `0002_seed.sql`; login con `CompareHashAndPassword`)
-- [ ] JWT real (`JWT_SECRET` en env, claims `{sub,email,role,iat,exp}` 2h, HS256) + `AuthMiddleware.RequireAuth`/`RequireRole("admin")`
+- [x] JWT real (`JWT_SECRET` en env, claims `{sub,email,role,iat,exp}` 2h, HS256) + `AuthMiddleware.RequireAuth`/`RequireRole("admin")`
 - [x] Protegidos `/api/network` y `/api/checkout` con el middleware (401 sin token / token adulterado)
 - [x] Checkout toma la identidad del TOKEN (`c.Locals` desde claims) — verificado: `email` falso en body NO se persiste ni atribuye comisiones
-- [ ] Errores sanitizados: `Details` solo con `APP_ENV=dev`; `ErrCantidadInvalida` propio (400 "cantidad debe ser mayor que cero", distinto de stock)
+- [x] Errores sanitizados: `Details` solo con `APP_ENV=dev`; `ErrInvalidQuantity` propio (400 "cantidad debe ser mayor que cero", distinto de stock)
 
 ---

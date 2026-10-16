@@ -28,25 +28,25 @@
 
 **Frontend**
 
-- [ ] `VITE_API_URL` en `.env` + plantilla `.env.example` versionada (`.env` en `.gitignore`); `data/constants.ts` lee `import.meta.env.VITE_API_URL` con defecto `http://localhost:4000`; tipado en `src/vite-env.d.ts`
-- [ ] Separar hooks y tipos de los Providers: `context/auth.ts` (`useAuth`, `AuthContext`, `Role`, `User`) y `context/cart.ts` (`useCart`, `CartContext`, `CartItem`); actualizar imports → `npm run lint` con 0 warnings
-- [ ] Botones de acción ≥44px (`min-h-11`): `Añadir al Carrito` (Catalog), steppers y eliminar (Cart), `Cerrar Sesión`, menú y avatar (Navbar)
-- [ ] Audit mobile-first a 375px sin overflow en Dashboard/MyNetwork/Catalog; reducir la sangría del árbol en móvil
+- [x] `VITE_API_URL` en `.env` + plantilla `.env.example` versionada (`.env` en `.gitignore`); `data/constants.ts` lee `import.meta.env.VITE_API_URL` con defecto `http://localhost:4000`; tipado en `src/vite-env.d.ts`
+- [x] Separar hooks y tipos de los Providers: `context/auth.ts` (`useAuth`, `AuthContext`, `Role`, `User`) y `context/cart.ts` (`useCart`, `CartContext`, `CartItem`); actualizar imports → `npm run lint` con 0 warnings
+- [x] Botones de acción ≥44px (`min-h-11`): `Añadir al Carrito` (Catalog), steppers y eliminar (Cart), `Cerrar Sesión`, menú y avatar (Navbar)
+- [ ] Audit mobile-first a 375px sin overflow en Dashboard/MyNetwork/Catalog; reducir la sangría del árbol en móvil — sangría reducida; falta la verificación visual a 375px en DevTools
 
 **Backend**
 
-- [ ] `GET /api/health` como método de `HealthController`: ping a PostgreSQL y Redis → `200 "ok"`, `200 "degraded"` (Redis caído), `503 "error"` (PostgreSQL caído); se conservan `/api/health/db` y `/api/health/redis`
-- [ ] Healthcheck del contenedor API: sonda en el binario (`/api healthcheck` → `GET /api/health`) en `Dockerfile` (`HEALTHCHECK`) y `docker-compose.yml`
-- [ ] `JWT_TTL` por defecto 2h (`config.go` y `.env.example`)
-- [ ] `APP_ENV`: `details` técnicos (restricciones, mensajes de PostgreSQL) solo con `APP_ENV=dev`; detalles redactados para el usuario siempre visibles (`DomainError.Public`)
-- [ ] `ErrInvalidQuantity`: 400 "cantidad debe ser mayor que cero", validado en el controlador y en el repositorio, distinto del 409 de stock (req.: `ErrCantidadInvalida`)
+- [x] `GET /api/health` como método de `HealthController`: ping a PostgreSQL y Redis → `200 "ok"`, `200 "degraded"` (Redis caído), `503 "error"` (PostgreSQL caído); se conservan `/api/health/db` y `/api/health/redis`
+- [x] Healthcheck del contenedor API: sonda en el binario (`/api healthcheck` → `GET /api/health`) en `Dockerfile` (`HEALTHCHECK`) y `docker-compose.yml`
+- [x] `JWT_TTL` por defecto 2h (`config.go` y `.env.example`)
+- [x] `APP_ENV`: `details` técnicos (restricciones, mensajes de PostgreSQL) solo con `APP_ENV=dev`; detalles redactados para el usuario siempre visibles (`DomainError.Public`)
+- [x] `ErrInvalidQuantity`: 400 "cantidad debe ser mayor que cero", validado en el controlador y en el repositorio, distinto del 409 de stock (req.: `ErrCantidadInvalida`)
 
 **Verificación**
 
-- [ ] `npm run lint` → 0 errores, 0 warnings; `npm run build` OK
-- [ ] `curl /api/health` con Redis detenido → `200 "degraded"`; con PostgreSQL detenido → `503`; `docker ps` muestra la API `healthy`/`unhealthy` según corresponda
-- [ ] Checkout con `quantity: 0` → `400 "cantidad debe ser mayor que cero"`; duplicado con `APP_ENV` vacío → `409` sin nombre de restricción
-- [ ] `go test ./...` y suite de regresión HTTP en verde
+- [x] `npm run lint` → 0 errores, 0 warnings; `npm run build` OK
+- [x] `curl /api/health` con Redis detenido → `200 "degraded"`; con PostgreSQL detenido → `503`; `docker ps` muestra la API `healthy`/`unhealthy` según corresponda
+- [x] Checkout con `quantity: 0` → `400 "cantidad debe ser mayor que cero"`; duplicado con `APP_ENV` vacío → `409` sin nombre de restricción
+- [x] `go test ./...` y suite de regresión HTTP en verde
 
 **Archivos:** `Frontend/.env.example`, `src/vite-env.d.ts`, `src/data/constants.ts`, `src/context/*`, componentes con botones; `Backend/config/config.go`, `controllers/healthController.go`, `controllers/helpers.go`, `controllers/checkoutController.go`, `repository/errors.go`, `repository/orders.go`, `healthcheck.go`, `main.go`, `routes/routes.go`, `Dockerfile`, `docker-compose.yml`, `.env.example`
 
@@ -263,7 +263,7 @@ errores por campo.
 
 | Fase | Entregable | Estado |
 |---|---|---|
-| 0 | Brechas del sílabo: `VITE_API_URL`, lint 0, touch 44px, health con deps + healthcheck, `JWT_TTL` 2h, `APP_ENV`, `ErrInvalidQuantity` | ⏳ Pendiente |
+| 0 | Brechas del sílabo: `VITE_API_URL`, lint 0, touch 44px, health con deps + healthcheck, `JWT_TTL` 2h, `APP_ENV`, `ErrInvalidQuantity` | 🟡 Implementada y verificada — falta la auditoría visual a 375px |
 | 1 | Migración `0004_backoffice.sql` | ⏳ Pendiente |
 | 2 | Registro con código de referido + admin de usuarios + vistas | ⏳ Pendiente (base: `POST /api/users`) |
 | 3 | CRUD productos (edición + baja lógica) | ⏳ Pendiente (base: `POST /api/products`) |
