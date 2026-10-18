@@ -81,18 +81,18 @@ const Confirmation = () => {
             </span>
           </div>
 
-          <div className="flex gap-4">
+          <div className="flex flex-col sm:flex-row gap-4">
             <Link
-              to="/store"
-              className="flex-1 text-center bg-[#20b2aa] text-white font-semibold py-3 rounded-lg hover:bg-[#008080] transition"
+              to="/my-orders"
+              className="flex-1 min-h-11 text-center bg-[#20b2aa] text-white font-semibold py-3 rounded-lg hover:bg-[#008080] transition"
             >
-              Seguir Comprando
+              Ver mis pedidos
             </Link>
             <Link
-              to="/catalog"
-              className="flex-1 text-center border border-slate-300 text-slate-700 font-semibold py-3 rounded-lg hover:bg-slate-50 transition"
+              to="/store"
+              className="flex-1 min-h-11 text-center border border-slate-300 text-slate-700 font-semibold py-3 rounded-lg hover:bg-slate-50 transition"
             >
-              Ver Catálogo
+              Seguir Comprando
             </Link>
           </div>
         </div>

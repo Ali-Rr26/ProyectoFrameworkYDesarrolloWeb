@@ -13,6 +13,8 @@ import Login from './components/Login';
 import Register from './components/Register';
 import AdminUsers from './components/AdminUsers';
 import AdminProducts from './components/AdminProducts';
+import AdminOrders from './components/AdminOrders';
+import MyOrders from './components/MyOrders';
 import { CartProvider } from './context/CartContext';
 import { AuthProvider } from './context/AuthContext';
 import { useAuth } from './context/auth';
@@ -76,6 +78,7 @@ function App() {
                   <Route path="my-network" element={<MyNetwork />} />
                   <Route path="admin/users" element={<AdminUsers />} />
                   <Route path="admin/products" element={<AdminProducts />} />
+                  <Route path="admin/orders" element={<AdminOrders />} />
                 </Route>
 
                 {/* Ambos roles: flujo de compra en línea */}
@@ -85,6 +88,7 @@ function App() {
                 <Route path="cart" element={<Cart />} />
                 <Route path="checkout" element={<Checkout />} />
                 <Route path="confirmation" element={<Confirmation />} />
+                <Route path="my-orders" element={<MyOrders />} />
               </Route>
             </Route>
 
