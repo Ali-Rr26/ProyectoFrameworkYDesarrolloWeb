@@ -9,8 +9,9 @@ const Layout = () => {
 
   const closeSidebar = () => setSidebarOpen(false);
 
+  // h-dvh: alto real de la pantalla (en móvil descuenta la barra del navegador, a diferencia de 100vh).
   return (
-    <div className="flex h-screen bg-slate-50">
+    <div className="flex h-dvh bg-slate-50">
       <Sidebar
         isOpen={sidebarOpen}
         isCollapsed={isCollapsed}
@@ -25,7 +26,10 @@ const Layout = () => {
           isCollapsed={isCollapsed}
         />
 
-        <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-8">
+        {/* relative: los elementos absolutos de las páginas (p. ej. etiquetas sr-only) se ubican y
+            recortan dentro de esta área con scroll; sin él escapan a la página y crean una segunda
+            barra de desplazamiento con una franja vacía al final. */}
+        <main className="relative flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-8">
           <Outlet />
         </main>
       </div>
