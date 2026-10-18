@@ -131,23 +131,25 @@ existente, galería en `product_images` e invalidación de `productos:all` (ante
 
 **Backend**
 
-- [ ] `PUT /api/products/:id` (admin): edición parcial; `404` si no existe (antes: `PUT /api/productos/:id`)
-- [ ] `DELETE /api/products/:id` (admin): `active = false`, no borra la fila (antes: `DELETE /api/productos/:id`)
-- [ ] `GET /api/products` y `/:id` públicos solo devuelven `active = true`
-- [ ] `GET /api/admin/products` (admin) incluye inactivos (antes: `/api/admin/productos`)
-- [ ] Invalidar `productos:all` tras `PUT` y `DELETE`
+- [x] `PUT /api/products/:id` (admin): edición parcial (galería se reemplaza completa; `active: true` reactiva); `404` si no existe; bloquea la fila durante la edición (antes: `PUT /api/productos/:id`)
+- [x] `DELETE /api/products/:id` (admin): `active = false`, no borra la fila; idempotente (antes: `DELETE /api/productos/:id`)
+- [x] `GET /api/products` y `/:id` públicos solo devuelven `active = true` (inactivo → `404`)
+- [x] `GET /api/admin/products` (admin) incluye inactivos, sin caché (antes: `/api/admin/productos`)
+- [x] Invalidar `productos:all` tras `PUT` y `DELETE`
+- [x] `GET /api/categories` (público): opciones del formulario de productos (el backend rechaza categorías inexistentes)
+- [x] Validación pura compartida por alta y edición (`validateProductInput` / `validateProductUpdate`): longitudes de columnas, precio dentro de `NUMERIC(10,2)`, URLs de galería
 
 **Frontend**
 
-- [ ] Ruta `/admin/products` (`AdminRoute`): tabla (imagen, nombre, categoría, precio, stock, activo) (antes: `/admin/productos`)
-- [ ] Formulario crear/editar mobile-first
-- [ ] Activar/desactivar con confirmación
+- [ ] Ruta `/admin/products` (`AdminRoute`): tabla (imagen, nombre, categoría, precio, stock, activo) (antes: `/admin/productos`) — implementada (`AdminProducts.tsx` + entrada "Productos" en el sidebar); falta verificación en navegador
+- [ ] Formulario crear/editar mobile-first — implementado (`ProductForm.tsx`, categorías desde la API); falta verificación en navegador
+- [ ] Activar/desactivar con confirmación — implementado; falta verificación en navegador
 
 **Verificación**
 
-- [ ] `PUT`/`DELETE` como cliente → `403`; como admin → `200`
-- [ ] Producto dado de baja desaparece del catálogo, sigue en `order_items` y el checkout lo rechaza (`422`)
-- [ ] `productos:all` eliminada de Redis tras cada escritura
+- [x] `PUT`/`DELETE` como cliente → `403`; como admin → `200`
+- [x] Producto dado de baja desaparece del catálogo, sigue en `order_items` y el checkout lo rechaza (`422`)
+- [x] `productos:all` eliminada de Redis tras cada escritura
 
 ---
 
@@ -277,7 +279,7 @@ errores por campo.
 | 0 | Brechas del sílabo: `VITE_API_URL`, lint 0, touch 44px, health con deps + healthcheck, `JWT_TTL` 2h, `APP_ENV`, `ErrInvalidQuantity` | 🟡 Implementada y verificada — falta la auditoría visual a 375px |
 | 1 | Migración `0004_backoffice.sql` | ✅ Implementada y verificada |
 | 2 | Registro con código de referido + admin de usuarios + vistas | 🟡 Backend verificado; vistas implementadas, falta recorrido en navegador |
-| 3 | CRUD productos (edición + baja lógica) | ⏳ Pendiente (base: `POST /api/products`) |
+| 3 | CRUD productos (edición + baja lógica) | 🟡 Backend verificado; vistas implementadas, falta recorrido en navegador |
 | 4 | Pedidos: consulta, estados, cancelación ACID | ⏳ Pendiente |
 | 5 | Comisiones del distribuidor + red visible al cliente | ⏳ Pendiente (base: ledger y `GET /api/network`) |
 | 6 | Liquidaciones | ⏳ Pendiente (base: `v_user_commissions`) |
