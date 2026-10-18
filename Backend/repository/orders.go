@@ -59,9 +59,9 @@ func (r *Repository) CreateOrder(ctx context.Context, userID int, req models.Cre
 	err = tx.QueryRowContext(ctx, `
 		INSERT INTO orders (user_id, payment_method_id, shipping_address, city, phone)
 		SELECT $1, pm.id, $3, $4, $5 FROM payment_methods pm WHERE pm.name = $2
-		RETURNING id, created_at`,
+		RETURNING id, created_at, status`,
 		userID, req.PaymentMethod, req.ShippingAddress, req.City, req.Phone,
-	).Scan(&order.ID, &order.CreatedAt)
+	).Scan(&order.ID, &order.CreatedAt, &order.Status)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, &DomainError{Kind: ErrInvalidRef, Detail: "método de pago inexistente: " + req.PaymentMethod, Public: true}
 	}

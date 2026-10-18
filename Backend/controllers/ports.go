@@ -37,6 +37,13 @@ type OrderRepository interface {
 	GetPaymentMethods(ctx context.Context) ([]string, error)
 }
 
+// OrderQueryRepository es el acceso a datos de la consulta y gestión de pedidos.
+type OrderQueryRepository interface {
+	ListOrders(ctx context.Context, f models.OrderFilter) (*models.Page[models.OrderSummary], error)
+	GetOrder(ctx context.Context, id int) (*models.OrderDetail, error)
+	UpdateOrderStatus(ctx context.Context, id int, status string) (*models.OrderDetail, error)
+}
+
 // UserRepository es el acceso a datos de cuentas.
 type UserRepository interface {
 	GetUsers(ctx context.Context) ([]models.User, error)

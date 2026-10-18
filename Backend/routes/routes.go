@@ -15,6 +15,7 @@ type Controllers struct {
 	Products *controllers.ProductController
 	Network  *controllers.NetworkController
 	Checkout *controllers.CheckoutController
+	Orders   *controllers.OrderController
 	Users    *controllers.UserController
 	Health   *controllers.HealthController
 }
@@ -56,9 +57,15 @@ func SetupRoutes(app *fiber.App, c Controllers) {
 	app.Post("/api/checkout", auth, c.Checkout.Checkout)
 	app.Post("/api/orders", auth, c.Checkout.Checkout)
 
+	// Pedidos: el cliente ve los suyos; /mine se registra antes que /:id.
+	app.Get("/api/orders/mine", auth, c.Orders.MyOrders)
+	app.Get("/api/orders/:id", auth, c.Orders.GetOrder)
+
 	// Solo administrador.
 	app.Get("/api/users", auth, adminOnly, c.Users.GetUsers)
 	app.Patch("/api/users/:id", auth, adminOnly, c.Users.UpdateUser)
+	app.Get("/api/orders", auth, adminOnly, c.Orders.ListOrders)
+	app.Patch("/api/orders/:id/status", auth, adminOnly, c.Orders.UpdateStatus)
 	app.Get("/api/admin/products", auth, adminOnly, c.Products.GetAdminProducts)
 	app.Post("/api/products", auth, adminOnly, c.Products.CreateProduct)
 	app.Put("/api/products/:id", auth, adminOnly, c.Products.UpdateProduct)

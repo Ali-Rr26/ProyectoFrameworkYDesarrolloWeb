@@ -3,7 +3,9 @@ package controllers
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
+	"strconv"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -44,6 +46,28 @@ func dbCtx(c *fiber.Ctx) (context.Context, context.CancelFunc) {
 	return context.WithTimeout(c.UserContext(), dbTimeout)
 }
 
+// Paginación estándar de los listados (?page=&limit=).
+const (
+	defaultPageLimit = 10
+	maxPageLimit     = 50
+)
+
+// pagination lee ?page (desde 1) y ?limit (1 a 50, por defecto 10) de la petición.
+func pagination(c *fiber.Ctx) (page, limit int, err error) {
+	page, limit = 1, defaultPageLimit
+	if v := c.Query("page"); v != "" {
+		if page, err = strconv.Atoi(v); err != nil || page < 1 {
+			return 0, 0, fmt.Errorf("page debe ser un entero mayor o igual a 1")
+		}
+	}
+	if v := c.Query("limit"); v != "" {
+		if limit, err = strconv.Atoi(v); err != nil || limit < 1 || limit > maxPageLimit {
+			return 0, 0, fmt.Errorf("limit debe ser un entero entre 1 y %d", maxPageLimit)
+		}
+	}
+	return page, limit, nil
+}
+
 // apiError responde con la estructura estándar APIError.
 func apiError(c *fiber.Ctx, status int, message string, details interface{}) error {
 	return c.Status(status).JSON(models.APIError{Status: status, Message: message, Details: details})
@@ -67,6 +91,10 @@ func repoError(c *fiber.Ctx, err error) error {
 		return apiError(c, fiber.StatusConflict, "El registro ya existe", detail)
 	case errors.Is(err, repository.ErrInvalidQuantity):
 		return apiError(c, fiber.StatusBadRequest, msgInvalidQuantity, detail)
+	case errors.Is(err, repository.ErrInvalidTransition):
+		return apiError(c, fiber.StatusBadRequest, "Transición de estado inválida", detail)
+	case errors.Is(err, repository.ErrCommissionsPaid):
+		return apiError(c, fiber.StatusConflict, "El pedido tiene comisiones ya liquidadas y no se puede cancelar", detail)
 	case errors.Is(err, repository.ErrInvalidReferral):
 		return apiError(c, fiber.StatusBadRequest, "Código de referido inválido", detail)
 	case errors.Is(err, repository.ErrProductInactive):

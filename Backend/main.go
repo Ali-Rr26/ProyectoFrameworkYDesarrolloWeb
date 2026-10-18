@@ -91,6 +91,7 @@ func main() {
 		Products: controllers.NewProductController(repo, redisCache),
 		Network:  controllers.NewNetworkController(repo, redisCache, cfg.NetworkRootEmail),
 		Checkout: controllers.NewCheckoutController(repo, redisCache, networkCache, commissions, cfg.CheckoutCommitDelay),
+		Orders:   controllers.NewOrderController(repo, redisCache, networkCache),
 		Users:    controllers.NewUserController(repo, networkCache),
 		Health:   controllers.NewHealthController(repo, redisCache),
 	}

@@ -171,6 +171,7 @@ type OrderItem struct {
 type Order struct {
 	ID        int         `json:"id"`
 	CreatedAt time.Time   `json:"created_at"`
+	Status    string      `json:"status"`
 	Total     float64     `json:"total"`
 	Items     []OrderItem `json:"items"`
 }

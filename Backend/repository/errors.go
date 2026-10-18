@@ -26,6 +26,10 @@ var (
 	ErrProductInactive = errors.New("producto no disponible")
 	// ErrInvalidReferral: el código de referido no corresponde a ningún afiliado (HTTP 400).
 	ErrInvalidReferral = errors.New("código de referido inválido")
+	// ErrInvalidTransition: el pedido no puede pasar a ese estado (HTTP 400).
+	ErrInvalidTransition = errors.New("transición de estado inválida")
+	// ErrCommissionsPaid: el pedido tiene comisiones ya liquidadas y no se cancela (HTTP 409).
+	ErrCommissionsPaid = errors.New("comisiones ya liquidadas")
 )
 
 // Códigos SQLSTATE de PostgreSQL que traducimos.

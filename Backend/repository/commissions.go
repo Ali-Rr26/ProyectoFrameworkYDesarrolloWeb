@@ -31,18 +31,41 @@ const commissionsQuery = `
 
 // CreateCommissions calcula y registra las comisiones de los patrocinadores (niveles
 // 1 a MaxNetworkLevel) de un pedido ya confirmado. Devuelve cuántas se insertaron:
-// 0 si el comprador no tiene patrocinador o si el pedido ya se había procesado.
+// 0 si el comprador no tiene patrocinador, si el pedido ya se había procesado o si fue
+// cancelado.
+//
+// Lee el pedido con FOR SHARE: si una cancelación está en curso (FOR UPDATE) espera a que
+// termine y ve el estado cancelled; si la cancelación llega después, es ella la que espera
+// y revierte las comisiones recién insertadas. Así nunca queda una comisión pendiente de
+// un pedido cancelado.
 func (r *Repository) CreateCommissions(ctx context.Context, orderID int) (int, error) {
-	res, err := r.db.ExecContext(ctx, commissionsQuery, orderID, MaxNetworkLevel)
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+
+	var status string
+	if err := tx.QueryRowContext(ctx, `SELECT status FROM orders WHERE id = $1 FOR SHARE`, orderID).Scan(&status); err != nil {
+		return 0, mapError(err)
+	}
+	if status == models.OrderCancelled {
+		return 0, tx.Commit()
+	}
+
+	res, err := tx.ExecContext(ctx, commissionsQuery, orderID, MaxNetworkLevel)
 	if err != nil {
 		return 0, mapError(err)
 	}
 	n, err := res.RowsAffected()
-	return int(n), err
+	if err != nil {
+		return 0, err
+	}
+	return int(n), tx.Commit()
 }
 
-// GetPendingCommissions devuelve los pedidos que debieron generar comisiones y no
-// tienen ninguna: los que quedaron sin procesar porque el servidor se detuvo entre el
+// GetPendingCommissions devuelve los pedidos no cancelados que debieron generar comisiones
+// y no tienen ninguna: los que quedaron sin procesar porque el servidor se detuvo entre el
 // COMMIT del pedido y el fin de la goroutine. Solo cuentan los compradores que ya
 // estaban afiliados al momento de la compra (no se pagan comisiones retroactivas).
 func (r *Repository) GetPendingCommissions(ctx context.Context) ([]models.PendingCommission, error) {
@@ -51,6 +74,7 @@ func (r *Repository) GetPendingCommissions(ctx context.Context) ([]models.Pendin
 		FROM orders o
 		JOIN network_members nm ON nm.user_id = o.user_id
 		WHERE nm.sponsor_id IS NOT NULL
+		  AND o.status <> 'cancelled'
 		  AND nm.joined_at <= o.created_at
 		  AND NOT EXISTS (SELECT 1 FROM commissions c WHERE c.order_id = o.id)
 		ORDER BY o.id`)
