@@ -16,8 +16,12 @@ import (
 // ProductRepository es el acceso a datos del catálogo.
 type ProductRepository interface {
 	GetProducts(ctx context.Context) ([]models.Product, error)
+	GetAllProducts(ctx context.Context) ([]models.Product, error)
 	GetProductByID(ctx context.Context, id int) (*models.Product, error)
+	GetCategories(ctx context.Context) ([]string, error)
 	CreateProduct(ctx context.Context, in models.ProductInput) (*models.Product, error)
+	UpdateProduct(ctx context.Context, id int, in models.ProductUpdate) (*models.Product, error)
+	DeactivateProduct(ctx context.Context, id int) (*models.Product, error)
 }
 
 // NetworkRepository es el acceso a datos de la red de referidos.

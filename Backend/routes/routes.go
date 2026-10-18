@@ -28,6 +28,7 @@ func SetupRoutes(app *fiber.App, c Controllers) {
 	// Catálogo de productos y detalle por ID.
 	app.Get("/api/products", c.Products.GetProducts)
 	app.Get("/api/products/:id", c.Products.GetProductByID)
+	app.Get("/api/categories", c.Products.GetCategories)
 
 	// Estado del servidor con sus dependencias (ok / degraded / 503) y pings individuales.
 	app.Get("/api/health", c.Health.Health)
@@ -58,5 +59,8 @@ func SetupRoutes(app *fiber.App, c Controllers) {
 	// Solo administrador.
 	app.Get("/api/users", auth, adminOnly, c.Users.GetUsers)
 	app.Patch("/api/users/:id", auth, adminOnly, c.Users.UpdateUser)
+	app.Get("/api/admin/products", auth, adminOnly, c.Products.GetAdminProducts)
 	app.Post("/api/products", auth, adminOnly, c.Products.CreateProduct)
+	app.Put("/api/products/:id", auth, adminOnly, c.Products.UpdateProduct)
+	app.Delete("/api/products/:id", auth, adminOnly, c.Products.DeleteProduct)
 }

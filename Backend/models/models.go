@@ -29,6 +29,9 @@ type Product struct {
 	Gallery []string `json:"gallery"`
 	// Stock son las unidades disponibles (el frontend lo usa para avisar "Agotado").
 	Stock int `json:"stock"`
+	// Active es false cuando el producto fue dado de baja (baja lógica): no se vende ni
+	// aparece en el catálogo público, pero sigue en el historial de pedidos.
+	Active bool `json:"active"`
 }
 
 // APIError estandariza respuestas de error HTTP.
@@ -106,6 +109,20 @@ type ProductInput struct {
 	Stock    int      `json:"stock"`
 	Image    string   `json:"image"`
 	Gallery  []string `json:"gallery"`
+}
+
+// ProductUpdate es el cuerpo de PUT /api/products/:id (solo admin): edición parcial,
+// los campos omitidos no cambian. Gallery, si viene, reemplaza la galería completa;
+// Active permite reactivar un producto dado de baja.
+type ProductUpdate struct {
+	Name        *string   `json:"name"`
+	Description *string   `json:"description"`
+	Category    *string   `json:"category"`
+	Price       *float64  `json:"price"`
+	Stock       *int      `json:"stock"`
+	Image       *string   `json:"image"`
+	Gallery     *[]string `json:"gallery"`
+	Active      *bool     `json:"active"`
 }
 
 // RegisterRequest es el cuerpo esperado para registrar un cliente (POST /api/users).
