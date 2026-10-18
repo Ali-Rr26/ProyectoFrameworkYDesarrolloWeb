@@ -163,24 +163,27 @@ token en `orders.user_id` y las líneas en `order_items`.
 
 **Backend**
 
-- [ ] `GET /api/orders/mine`: pedidos del usuario del token, paginado (antes: `GET /api/pedidos/mios`)
-- [ ] `GET /api/orders` (admin): todos, paginado + filtro `?status=` (antes: `GET /api/pedidos`)
-- [ ] `GET /api/orders/:id`: cabecera + ítems con nombre de producto; solo dueño o admin (ajeno → `404`) (antes: `GET /api/pedidos/:id`)
-- [ ] `PATCH /api/orders/:id/status` (admin): `pending→preparing→shipped→delivered`; `cancelled` solo desde `pending`/`preparing`; transición inválida → `400` (antes: `PATCH /api/pedidos/:id/estado`)
-- [ ] Cancelación en **transacción**: `SELECT … FOR UPDATE` del pedido, `status='cancelled'`, reponer stock por ítem, `commissions.status='reversed'`; invalidar `productos:all` y `red:tree:*`
-- [ ] `RecoverPending` ignora pedidos cancelados
+- [x] `GET /api/orders/mine`: pedidos del usuario del token, paginado `{data, page, limit, total}` (`?page`, `?limit` 1–50) (antes: `GET /api/pedidos/mios`)
+- [x] `GET /api/orders` (admin): todos, paginado + filtro `?status=` (antes: `GET /api/pedidos`)
+- [x] `GET /api/orders/:id`: cabecera + ítems con nombre de producto + `next_statuses`; solo dueño o admin (ajeno → `404`) (antes: `GET /api/pedidos/:id`)
+- [x] `PATCH /api/orders/:id/status` (admin): `pending→preparing→shipped→delivered`; `cancelled` solo desde `pending`/`preparing`; transición inválida → `400` (antes: `PATCH /api/pedidos/:id/estado`)
+- [x] Cancelación en **transacción**: `SELECT … FOR UPDATE` del pedido, `status='cancelled'`, reponer stock por ítem (productos bloqueados en orden de ID), `commissions.status='reversed'`; invalidar `productos:all` y `red:tree:*`; con comisiones ya pagadas → `409`
+- [x] Reglas del ciclo de vida como función pura (`models.OrderTransitionAllowed`, replicada en `data/orders.ts`)
+- [x] Carrera cancelación/comisiones resuelta: la goroutine lee el pedido con `FOR SHARE` y no paga comisiones de pedidos cancelados
+- [x] `RecoverPending` ignora pedidos cancelados
 
 **Frontend**
 
-- [ ] `/my-orders` (cliente): número, fecha, total, estado + detalle expandible (antes: `/mis-pedidos`)
-- [ ] `/admin/orders` (admin): tabla con filtro por estado + cambio de estado (antes: `/admin/pedidos`)
-- [ ] Enlace a `/my-orders` desde el navbar y desde la confirmación
+- [ ] `/my-orders` (cliente): número, fecha, total, estado + detalle expandible (antes: `/mis-pedidos`) — implementada (`MyOrders.tsx`, `OrderCard.tsx`, `Pagination.tsx`); falta verificación en navegador
+- [ ] `/admin/orders` (admin): tabla con filtro por estado + cambio de estado (antes: `/admin/pedidos`) — implementada (`AdminOrders.tsx`, acciones solo con transiciones válidas y confirmación al cancelar); falta verificación en navegador
+- [ ] Enlace a `/my-orders` desde el navbar y desde la confirmación — implementado en el sidebar ("Mis Pedidos" y "Pedidos" para admin) y en la confirmación; falta verificación en navegador
 
 **Verificación**
 
-- [ ] Cliente A no ve pedidos de cliente B (`/mine` por token; `/:id` ajeno → `404`)
-- [ ] Cancelar → stock restaurado, comisiones `reversed` y saldo de `v_user_commissions` reducido
-- [ ] Transición inválida (`delivered→pending`) → `400`
+- [x] Cliente A no ve pedidos de cliente B (`/mine` por token; `/:id` ajeno → `404`)
+- [x] Cancelar → stock restaurado, comisiones `reversed` y saldo de `v_user_commissions` reducido
+- [x] Cancelar justo después de comprar no deja comisiones `pending`; con comisiones pagadas → `409` sin cambios
+- [x] Transición inválida (`delivered→pending`) → `400`
 
 ---
 
@@ -280,7 +283,7 @@ errores por campo.
 | 1 | Migración `0004_backoffice.sql` | ✅ Implementada y verificada |
 | 2 | Registro con código de referido + admin de usuarios + vistas | 🟡 Backend verificado; vistas implementadas, falta recorrido en navegador |
 | 3 | CRUD productos (edición + baja lógica) | 🟡 Backend verificado; vistas implementadas, falta recorrido en navegador |
-| 4 | Pedidos: consulta, estados, cancelación ACID | ⏳ Pendiente |
+| 4 | Pedidos: consulta, estados, cancelación ACID | 🟡 Backend verificado; vistas implementadas, falta recorrido en navegador |
 | 5 | Comisiones del distribuidor + red visible al cliente | ⏳ Pendiente (base: ledger y `GET /api/network`) |
 | 6 | Liquidaciones | ⏳ Pendiente (base: `v_user_commissions`) |
 | 7 | Reportes + Dashboard real | ⏳ Pendiente (base: vistas SQL) |
