@@ -12,6 +12,7 @@ import Confirmation from './components/Confirmation';
 import Login from './components/Login';
 import Register from './components/Register';
 import AdminUsers from './components/AdminUsers';
+import AdminProducts from './components/AdminProducts';
 import { CartProvider } from './context/CartContext';
 import { AuthProvider } from './context/AuthContext';
 import { useAuth } from './context/auth';
@@ -74,6 +75,7 @@ function App() {
                   <Route index element={<Dashboard />} />
                   <Route path="my-network" element={<MyNetwork />} />
                   <Route path="admin/users" element={<AdminUsers />} />
+                  <Route path="admin/products" element={<AdminProducts />} />
                 </Route>
 
                 {/* Ambos roles: flujo de compra en línea */}
