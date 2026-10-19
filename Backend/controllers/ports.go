@@ -16,8 +16,12 @@ import (
 // ProductRepository es el acceso a datos del catálogo.
 type ProductRepository interface {
 	GetProducts(ctx context.Context) ([]models.Product, error)
+	ListAllProducts(ctx context.Context, f models.ListFilter) (*models.Page[models.Product], error)
 	GetProductByID(ctx context.Context, id int) (*models.Product, error)
+	GetCategories(ctx context.Context) ([]string, error)
 	CreateProduct(ctx context.Context, in models.ProductInput) (*models.Product, error)
+	UpdateProduct(ctx context.Context, id int, in models.ProductUpdate) (*models.Product, error)
+	DeactivateProduct(ctx context.Context, id int) (*models.Product, error)
 }
 
 // NetworkRepository es el acceso a datos de la red de referidos.
@@ -33,10 +37,37 @@ type OrderRepository interface {
 	GetPaymentMethods(ctx context.Context) ([]string, error)
 }
 
+// OrderQueryRepository es el acceso a datos de la consulta y gestión de pedidos.
+type OrderQueryRepository interface {
+	ListOrders(ctx context.Context, f models.OrderFilter) (*models.Page[models.OrderSummary], error)
+	GetOrder(ctx context.Context, id int) (*models.OrderDetail, error)
+	UpdateOrderStatus(ctx context.Context, id int, status string) (*models.OrderDetail, error)
+}
+
+// CommissionQueryRepository es la consulta del ledger de comisiones de un distribuidor.
+type CommissionQueryRepository interface {
+	ListUserCommissions(ctx context.Context, userID, page, limit int) (*models.CommissionLedger, error)
+}
+
+// PayoutRepository es el acceso a datos de las liquidaciones y la deuda por distribuidor.
+type PayoutRepository interface {
+	CreatePayout(ctx context.Context, beneficiaryID int) (*models.Payout, error)
+	ListPayouts(ctx context.Context, beneficiaryID *int, page, limit int) (*models.Page[models.Payout], error)
+	GetPendingDebts(ctx context.Context) ([]models.PendingDebt, error)
+}
+
+// ReportRepository son las consultas agregadas de los reportes del Dashboard.
+type ReportRepository interface {
+	GetSalesSummary(ctx context.Context, period models.DateRange) (*models.SalesSummary, error)
+	GetTopProducts(ctx context.Context, period models.DateRange, limit int) ([]models.TopProduct, error)
+	GetTopSponsors(ctx context.Context, period models.DateRange, limit int) ([]models.TopSponsor, error)
+}
+
 // UserRepository es el acceso a datos de cuentas.
 type UserRepository interface {
-	GetUsers(ctx context.Context) ([]models.User, error)
+	ListUsers(ctx context.Context, f models.ListFilter) (*models.Page[models.User], error)
 	CreateUser(ctx context.Context, in models.RegisterRequest) (*models.User, error)
+	UpdateUser(ctx context.Context, id int, in models.UpdateUserRequest) (*models.User, error)
 }
 
 // CredentialRepository busca la cuenta con la que se inicia sesión.
@@ -52,6 +83,12 @@ type Pinger interface {
 // TokenIssuer emite JWT (login).
 type TokenIssuer interface {
 	Generate(userID int, email, role string) (string, time.Time, error)
+}
+
+// AccountLookup consulta el estado vigente de una cuenta (middleware de autenticación):
+// el JWT dice quién es el usuario, la base dice si sigue activo y con qué rol.
+type AccountLookup interface {
+	GetUserByID(ctx context.Context, id int) (*models.User, error)
 }
 
 // TokenParser valida JWT (middleware).

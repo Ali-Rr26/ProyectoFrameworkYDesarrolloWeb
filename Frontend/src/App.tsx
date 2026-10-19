@@ -10,8 +10,15 @@ import Cart from './components/Cart';
 import Checkout from './components/Checkout';
 import Confirmation from './components/Confirmation';
 import Login from './components/Login';
+import Register from './components/Register';
+import AdminUsers from './components/AdminUsers';
+import AdminProducts from './components/AdminProducts';
+import AdminOrders from './components/AdminOrders';
+import AdminPayouts from './components/AdminPayouts';
+import MyOrders from './components/MyOrders';
 import { CartProvider } from './context/CartContext';
-import { AuthProvider, useAuth } from './context/AuthContext';
+import { AuthProvider } from './context/AuthContext';
+import { useAuth } from './context/auth';
 
 // Componente para proteger las rutas privadas: exige estar autenticado
 const ProtectedRoute = () => {
@@ -61,23 +68,29 @@ function App() {
           <Routes>
             {/* Ruta pública */}
             <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
 
             {/* Rutas protegidas (requieren login) */}
             <Route element={<ProtectedRoute />}>
               <Route path="/" element={<Layout />}>
-                {/* Solo administrador: Dashboard y Red multinivel */}
+                {/* Solo administrador: Dashboard y paneles de gestión */}
                 <Route element={<AdminRoute />}>
                   <Route index element={<Dashboard />} />
-                  <Route path="my-network" element={<MyNetwork />} />
+                  <Route path="admin/users" element={<AdminUsers />} />
+                  <Route path="admin/products" element={<AdminProducts />} />
+                  <Route path="admin/orders" element={<AdminOrders />} />
+                  <Route path="admin/payouts" element={<AdminPayouts />} />
                 </Route>
 
-                {/* Ambos roles: flujo de compra en línea */}
+                {/* Ambos roles: compra, pedidos y red de referidos */}
                 <Route path="store" element={<Storefront />} />
                 <Route path="catalog" element={<Catalog />} />
                 <Route path="product/:id" element={<ProductDetail />} />
                 <Route path="cart" element={<Cart />} />
                 <Route path="checkout" element={<Checkout />} />
                 <Route path="confirmation" element={<Confirmation />} />
+                <Route path="my-orders" element={<MyOrders />} />
+                <Route path="my-network" element={<MyNetwork />} />
               </Route>
             </Route>
 

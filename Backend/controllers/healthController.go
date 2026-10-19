@@ -20,12 +20,49 @@ func NewHealthController(db Pinger, c cache.Cache) *HealthController {
 	return &HealthController{db: db, cache: c}
 }
 
-// Health devuelve el estado de salud del servidor.
-func Health(c *fiber.Ctx) error {
-	return c.JSON(fiber.Map{
-		"status":  "ok",
-		"message": "Servidor Go/Fiber operativo",
+// Estados de GET /api/health.
+const (
+	healthOK       = "ok"       // PostgreSQL y Redis responden.
+	healthDegraded = "degraded" // Redis caído: la API funciona sin caché (200).
+	healthError    = "error"    // PostgreSQL caído: la API no puede atender (503).
+)
+
+// Tiempos máximos de cada ping: el health check debe responder rápido aunque algo caiga.
+const (
+	healthDBTimeout    = 2 * time.Second
+	healthRedisTimeout = time.Second
+)
+
+// Health devuelve el estado del servidor y de sus dependencias:
+//   - 200 "ok":       PostgreSQL y Redis operativos.
+//   - 200 "degraded": Redis no responde; se sirve desde PostgreSQL sin caché.
+//   - 503 "error":    PostgreSQL no responde; el balanceador debe sacar esta instancia.
+func (h *HealthController) Health(c *fiber.Ctx) error {
+	database := h.ping(c, healthDBTimeout, h.db.Ping)
+	redis := h.ping(c, healthRedisTimeout, h.cache.Ping)
+
+	status, code := healthOK, fiber.StatusOK
+	switch {
+	case database != healthOK:
+		status, code = healthError, fiber.StatusServiceUnavailable
+	case redis != healthOK:
+		status = healthDegraded
+	}
+	return c.Status(code).JSON(fiber.Map{
+		"status":   status,
+		"database": database,
+		"redis":    redis,
 	})
+}
+
+// ping ejecuta la verificación con su propio límite de tiempo y devuelve "ok" o "error".
+func (h *HealthController) ping(c *fiber.Ctx, timeout time.Duration, check func(context.Context) error) string {
+	ctx, cancel := context.WithTimeout(c.UserContext(), timeout)
+	defer cancel()
+	if err := check(ctx); err != nil {
+		return healthError
+	}
+	return healthOK
 }
 
 // HealthDB verifica que PostgreSQL responda (200 si está operativo, 503 si no).

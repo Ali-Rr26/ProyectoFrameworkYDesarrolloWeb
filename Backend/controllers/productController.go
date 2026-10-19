@@ -4,7 +4,6 @@ package controllers
 import (
 	"errors"
 	"strconv"
-	"strings"
 
 	// Importamos Fiber para manejar la respuesta HTTP.
 	"github.com/gofiber/fiber/v2"
@@ -38,6 +37,37 @@ func (h *ProductController) GetProducts(c *fiber.Ctx) error {
 	}
 	c.Set(cache.HeaderName, string(status))
 	// Fiber convierte automáticamente el slice de estructuras a formato JSON.
+	return c.JSON(products)
+}
+
+// GetCategories lista las categorías del catálogo (público; las usa el formulario de productos).
+func (h *ProductController) GetCategories(c *fiber.Ctx) error {
+	ctx, cancel := dbCtx(c)
+	defer cancel()
+
+	categories, err := h.repo.GetCategories(ctx)
+	if err != nil {
+		return repoError(c, err)
+	}
+	return c.JSON(categories)
+}
+
+// GetAdminProducts lista los productos, incluidos los dados de baja (solo admin), paginados
+// y con búsqueda ?q= por nombre o categoría. No usa la caché: el administrador siempre ve
+// el estado actual; el catálogo público sigue completo y cacheado.
+func (h *ProductController) GetAdminProducts(c *fiber.Ctx) error {
+	filter, err := listFilter(c)
+	if err != nil {
+		return apiError(c, fiber.StatusBadRequest, "Parámetros de listado inválidos", err.Error())
+	}
+
+	ctx, cancel := dbCtx(c)
+	defer cancel()
+
+	products, err := h.repo.ListAllProducts(ctx, filter)
+	if err != nil {
+		return repoError(c, err)
+	}
 	return c.JSON(products)
 }
 
@@ -75,28 +105,7 @@ func (h *ProductController) CreateProduct(c *fiber.Ctx) error {
 	}
 
 	// Validamos antes de tocar la base: errores claros por campo.
-	in.Name = strings.TrimSpace(in.Name)
-	in.Category = strings.TrimSpace(in.Category)
-	in.Image = strings.TrimSpace(in.Image)
-	fieldErrors := map[string]string{}
-	if in.Name == "" {
-		fieldErrors["name"] = "es requerido"
-	} else if len(in.Name) > 120 {
-		fieldErrors["name"] = "máximo 120 caracteres"
-	}
-	if in.Price <= 0 {
-		fieldErrors["price"] = "debe ser mayor a 0"
-	}
-	if in.Stock < 0 {
-		fieldErrors["stock"] = "no puede ser negativo"
-	}
-	if in.Category == "" {
-		fieldErrors["category"] = "es requerida"
-	}
-	if in.Image == "" {
-		fieldErrors["image"] = "es requerida"
-	}
-	if len(fieldErrors) > 0 {
+	if fieldErrors := validateProductInput(&in); len(fieldErrors) > 0 {
 		return apiError(c, fiber.StatusBadRequest, "Datos de producto inválidos", fieldErrors)
 	}
 
@@ -110,4 +119,56 @@ func (h *ProductController) CreateProduct(c *fiber.Ctx) error {
 	// El catálogo en caché ya no incluye el producto nuevo: se invalida.
 	cache.Delete(h.cache, cache.KeyProducts)
 	return c.Status(fiber.StatusCreated).JSON(product)
+}
+
+// UpdateProduct edita un producto de forma parcial (PUT /api/products/:id, solo admin).
+// También permite reactivar un producto dado de baja con {"active": true}.
+func (h *ProductController) UpdateProduct(c *fiber.Ctx) error {
+	id, err := strconv.Atoi(c.Params("id"))
+	if err != nil || id <= 0 {
+		return apiError(c, fiber.StatusBadRequest, "ID inválido, debe ser un número", c.Params("id"))
+	}
+
+	var in models.ProductUpdate
+	if err := c.BodyParser(&in); err != nil {
+		return apiError(c, fiber.StatusBadRequest, "Cuerpo de petición inválido", nil)
+	}
+	if fieldErrors := validateProductUpdate(&in); len(fieldErrors) > 0 {
+		return apiError(c, fiber.StatusBadRequest, "Datos de producto inválidos", fieldErrors)
+	}
+
+	ctx, cancel := dbCtx(c)
+	defer cancel()
+
+	product, err := h.repo.UpdateProduct(ctx, id, in)
+	if errors.Is(err, repository.ErrNotFound) {
+		return apiError(c, fiber.StatusNotFound, "Producto no encontrado", id)
+	}
+	if err != nil {
+		return repoError(c, err)
+	}
+	cache.Delete(h.cache, cache.KeyProducts)
+	return c.JSON(product)
+}
+
+// DeleteProduct da de baja un producto (DELETE /api/products/:id, solo admin). Es una
+// baja lógica: deja de venderse y de mostrarse, pero se conserva en los pedidos.
+func (h *ProductController) DeleteProduct(c *fiber.Ctx) error {
+	id, err := strconv.Atoi(c.Params("id"))
+	if err != nil || id <= 0 {
+		return apiError(c, fiber.StatusBadRequest, "ID inválido, debe ser un número", c.Params("id"))
+	}
+
+	ctx, cancel := dbCtx(c)
+	defer cancel()
+
+	product, err := h.repo.DeactivateProduct(ctx, id)
+	if errors.Is(err, repository.ErrNotFound) {
+		return apiError(c, fiber.StatusNotFound, "Producto no encontrado", id)
+	}
+	if err != nil {
+		return repoError(c, err)
+	}
+	cache.Delete(h.cache, cache.KeyProducts)
+	return c.JSON(product)
 }

@@ -19,6 +19,19 @@ var (
 	ErrConstraint = errors.New("restricción de datos violada")
 	// ErrInsufficientStock: no hay unidades suficientes para completar la compra (HTTP 409).
 	ErrInsufficientStock = errors.New("stock insuficiente")
+	// ErrInvalidQuantity: la cantidad de una línea es cero o negativa (HTTP 400).
+	// Es un error de entrada, distinto de ErrInsufficientStock (falta de inventario).
+	ErrInvalidQuantity = errors.New("cantidad inválida")
+	// ErrProductInactive: el producto fue dado de baja y ya no se vende (HTTP 422).
+	ErrProductInactive = errors.New("producto no disponible")
+	// ErrInvalidReferral: el código de referido no corresponde a ningún afiliado (HTTP 400).
+	ErrInvalidReferral = errors.New("código de referido inválido")
+	// ErrInvalidTransition: el pedido no puede pasar a ese estado (HTTP 400).
+	ErrInvalidTransition = errors.New("transición de estado inválida")
+	// ErrCommissionsPaid: el pedido tiene comisiones ya liquidadas y no se cancela (HTTP 409).
+	ErrCommissionsPaid = errors.New("comisiones ya liquidadas")
+	// ErrNothingToPay: el distribuidor no tiene comisiones de pedidos entregados por liquidar (HTTP 409).
+	ErrNothingToPay = errors.New("sin comisiones pendientes")
 )
 
 // Códigos SQLSTATE de PostgreSQL que traducimos.
@@ -32,6 +45,13 @@ const (
 // stockConstraint es la restricción que lanza el trigger de inventario
 // (fn_order_items_stock) cuando no hay unidades suficientes.
 const stockConstraint = "ck_products_stock_available"
+
+// quantityConstraint es el CHECK (quantity > 0) de order_items (nombre generado por PostgreSQL).
+const quantityConstraint = "order_items_quantity_check"
+
+// inactiveProductConstraint es la restricción que lanza el trigger de inventario
+// cuando se intenta vender un producto dado de baja (migración 0004).
+const inactiveProductConstraint = "ck_products_active"
 
 // mapError convierte errores del driver en errores del dominio, conservando el original envuelto.
 func mapError(err error) error {
@@ -50,8 +70,13 @@ func mapError(err error) error {
 			return &DomainError{Kind: ErrInvalidRef, Detail: pgErr.ConstraintName}
 		case pgCheckViolation, pgNotNullViolation:
 			// El trigger de inventario usa check_violation con una restricción propia.
-			if pgErr.ConstraintName == stockConstraint {
+			switch pgErr.ConstraintName {
+			case stockConstraint:
 				return &DomainError{Kind: ErrInsufficientStock, Detail: pgErr.Message}
+			case quantityConstraint:
+				return &DomainError{Kind: ErrInvalidQuantity, Detail: pgErr.ConstraintName}
+			case inactiveProductConstraint:
+				return &DomainError{Kind: ErrProductInactive, Detail: pgErr.Message}
 			}
 			detail := pgErr.ConstraintName
 			if detail == "" {
@@ -68,6 +93,10 @@ func mapError(err error) error {
 type DomainError struct {
 	Kind   error
 	Detail string
+	// Public indica que Detail fue redactado para el usuario ("producto 3") y puede
+	// mostrarse siempre. Si es false (nombres de restricciones o mensajes de PostgreSQL
+	// que arma mapError) solo se expone con APP_ENV=dev.
+	Public bool
 }
 
 func (e *DomainError) Error() string { return e.Kind.Error() + ": " + e.Detail }

@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useCart } from "../context/CartContext";
-import { useAuth } from "../context/AuthContext";
+import { useCart } from "../context/cart";
+import { useAuth } from "../context/auth";
 import { Menu, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { ICON_SIZES } from '../constants/ui';
 import { ROLE_LABELS } from '../data/constants';
@@ -41,7 +41,7 @@ const Navbar = ({ onMenuClick, onToggleCollapse, isCollapsed }: NavbarProps) => 
       <div className="flex items-center gap-2 sm:gap-4">
         <button
           onClick={onMenuClick}
-          className="p-2 hover:bg-slate-100 rounded transition lg:hidden"
+          className="min-w-11 min-h-11 flex items-center justify-center p-2 hover:bg-slate-100 rounded transition lg:hidden"
           aria-label="Abrir/cerrar menú"
         >
           <Menu size={ICON_SIZES.NAVBAR} />
@@ -49,7 +49,7 @@ const Navbar = ({ onMenuClick, onToggleCollapse, isCollapsed }: NavbarProps) => 
 
         <button
           onClick={onToggleCollapse}
-          className="hidden lg:flex p-2 hover:bg-slate-100 rounded transition"
+          className="hidden lg:flex min-w-11 min-h-11 items-center justify-center p-2 hover:bg-slate-100 rounded transition"
           aria-label="Colapsar/expandir sidebar"
           title={isCollapsed ? "Expandir" : "Colapsar"}
         >
@@ -96,7 +96,7 @@ const Navbar = ({ onMenuClick, onToggleCollapse, isCollapsed }: NavbarProps) => 
           <div className="relative group cursor-pointer pb-2" ref={dropdownRef}>
             <button
               onClick={() => setIsOpen(!isOpen)}
-              className="w-8 h-8 rounded-full bg-slate-200 overflow-hidden border border-slate-300 flex items-center justify-center flex-shrink-0 hover:bg-slate-300 transition"
+              className="w-11 h-11 rounded-full bg-slate-200 overflow-hidden border border-slate-300 flex items-center justify-center flex-shrink-0 hover:bg-slate-300 transition"
               aria-label="Menú de usuario"
             >
               <img
@@ -111,7 +111,7 @@ const Navbar = ({ onMenuClick, onToggleCollapse, isCollapsed }: NavbarProps) => 
             }`}>
               <button
                 onClick={handleLogout}
-                className="w-full text-left px-4 py-2 text-sm text-red-600 font-semibold hover:bg-red-50 rounded-md transition-colors"
+                className="w-full min-h-11 text-left px-4 py-2 text-sm text-red-600 font-semibold hover:bg-red-50 rounded-md transition-colors"
               >
                 Cerrar Sesión
               </button>

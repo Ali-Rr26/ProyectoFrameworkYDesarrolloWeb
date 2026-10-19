@@ -1,7 +1,7 @@
 // src/components/Catalog.tsx
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { useCart } from '../context/CartContext';
+import { useCart } from '../context/cart';
 import { getProducts } from '../services/productService';
 import CustomSelect from './CustomSelect';
 import type { Product } from '../data/products';
@@ -155,7 +155,7 @@ const Catalog = () => {
                 <button
                   onClick={() => addToCart(product)}
                   disabled={soldOut || limitReached}
-                  className="mt-auto w-full bg-[#20b2aa] text-white py-2 rounded text-sm hover:bg-[#008080] transition disabled:bg-slate-300 disabled:cursor-not-allowed"
+                  className="mt-auto w-full min-h-11 bg-[#20b2aa] text-white py-2 rounded text-sm hover:bg-[#008080] transition disabled:bg-slate-300 disabled:cursor-not-allowed"
                 >
                   {soldOut ? "Agotado" : limitReached ? "Máximo en el carrito" : "Añadir al Carrito"}
                 </button>

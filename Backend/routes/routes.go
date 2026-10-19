@@ -10,13 +10,17 @@ import (
 
 // Controllers agrupa los controladores ya construidos en main con sus dependencias inyectadas.
 type Controllers struct {
-	Auth     *controllers.AuthMiddleware
-	Login    *controllers.AuthController
-	Products *controllers.ProductController
-	Network  *controllers.NetworkController
-	Checkout *controllers.CheckoutController
-	Users    *controllers.UserController
-	Health   *controllers.HealthController
+	Auth        *controllers.AuthMiddleware
+	Login       *controllers.AuthController
+	Products    *controllers.ProductController
+	Network     *controllers.NetworkController
+	Checkout    *controllers.CheckoutController
+	Orders      *controllers.OrderController
+	Commissions *controllers.CommissionController
+	Payouts     *controllers.PayoutController
+	Reports     *controllers.ReportController
+	Users       *controllers.UserController
+	Health      *controllers.HealthController
 }
 
 // SetupRoutes recibe la aplicación Fiber y los controladores para registrar las rutas.
@@ -28,9 +32,10 @@ func SetupRoutes(app *fiber.App, c Controllers) {
 	// Catálogo de productos y detalle por ID.
 	app.Get("/api/products", c.Products.GetProducts)
 	app.Get("/api/products/:id", c.Products.GetProductByID)
+	app.Get("/api/categories", c.Products.GetCategories)
 
-	// Estado del servidor, de PostgreSQL y de Redis.
-	app.Get("/api/health", controllers.Health)
+	// Estado del servidor con sus dependencias (ok / degraded / 503) y pings individuales.
+	app.Get("/api/health", c.Health.Health)
 	app.Get("/api/health/db", c.Health.HealthDB)
 	app.Get("/api/health/redis", c.Health.HealthRedis)
 
@@ -43,8 +48,15 @@ func SetupRoutes(app *fiber.App, c Controllers) {
 	auth := c.Auth.RequireAuth
 	adminOnly := c.Auth.RequireRole("admin")
 
+	// Cuenta autenticada (el frontend valida la sesión al cargar).
+	app.Get("/api/me", auth, c.Login.Me)
+
 	// Red de referidos: el cliente ve la suya; el admin puede consultar cualquiera.
 	app.Get("/api/network", auth, c.Network.GetNetwork)
+
+	// Ledger de comisiones del distribuidor autenticado.
+	app.Get("/api/commissions/mine", auth, c.Commissions.MyCommissions)
+	app.Get("/api/payouts/mine", auth, c.Payouts.MyPayouts)
 
 	// Compra: el comprador se toma del token. /api/orders se conserva como alias de
 	// /api/checkout para no romper clientes de la Fase 2.
@@ -52,7 +64,23 @@ func SetupRoutes(app *fiber.App, c Controllers) {
 	app.Post("/api/checkout", auth, c.Checkout.Checkout)
 	app.Post("/api/orders", auth, c.Checkout.Checkout)
 
+	// Pedidos: el cliente ve los suyos; /mine se registra antes que /:id.
+	app.Get("/api/orders/mine", auth, c.Orders.MyOrders)
+	app.Get("/api/orders/:id", auth, c.Orders.GetOrder)
+
 	// Solo administrador.
 	app.Get("/api/users", auth, adminOnly, c.Users.GetUsers)
+	app.Patch("/api/users/:id", auth, adminOnly, c.Users.UpdateUser)
+	app.Get("/api/payouts", auth, adminOnly, c.Payouts.ListPayouts)
+	app.Post("/api/payouts", auth, adminOnly, c.Payouts.CreatePayout)
+	app.Get("/api/reports/summary", auth, adminOnly, c.Reports.Summary)
+	app.Get("/api/reports/top-products", auth, adminOnly, c.Reports.TopProducts)
+	app.Get("/api/reports/top-sponsors", auth, adminOnly, c.Reports.TopSponsors)
+	app.Get("/api/reports/pending-commissions", auth, adminOnly, c.Payouts.PendingCommissions)
+	app.Get("/api/orders", auth, adminOnly, c.Orders.ListOrders)
+	app.Patch("/api/orders/:id/status", auth, adminOnly, c.Orders.UpdateStatus)
+	app.Get("/api/admin/products", auth, adminOnly, c.Products.GetAdminProducts)
 	app.Post("/api/products", auth, adminOnly, c.Products.CreateProduct)
+	app.Put("/api/products/:id", auth, adminOnly, c.Products.UpdateProduct)
+	app.Delete("/api/products/:id", auth, adminOnly, c.Products.DeleteProduct)
 }

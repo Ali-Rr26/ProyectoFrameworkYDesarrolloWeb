@@ -8,6 +8,8 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	// Base de zonas horarias embebida: la imagen alpine no trae tzdata y APP_TIMEZONE la necesita.
+	_ "time/tzdata"
 
 	// Importamos el framework principal Fiber.
 	"github.com/gofiber/fiber/v2"
@@ -30,6 +32,12 @@ const shutdownTimeout = 15 * time.Second
 
 // func main es el punto de entrada de la aplicación en Go. Todo comienza a ejecutarse aquí.
 func main() {
+	// Modo sonda para el HEALTHCHECK de Docker: verifica el servidor ya en marcha y termina
+	// (no carga configuración ni abre conexiones).
+	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
+		os.Exit(runHealthcheck())
+	}
+
 	// 1. Configuración desde variables de entorno (.env en desarrollo).
 	cfg, err := config.Load()
 	if err != nil {
@@ -80,13 +88,17 @@ func main() {
 	commissions.RecoverPending()
 
 	ctrls := routes.Controllers{
-		Auth:     controllers.NewAuthMiddleware(jwtManager),
-		Login:    controllers.NewAuthController(repo, jwtManager),
-		Products: controllers.NewProductController(repo, redisCache),
-		Network:  controllers.NewNetworkController(repo, redisCache, cfg.NetworkRootEmail),
-		Checkout: controllers.NewCheckoutController(repo, redisCache, networkCache, commissions, cfg.CheckoutCommitDelay),
-		Users:    controllers.NewUserController(repo, networkCache),
-		Health:   controllers.NewHealthController(repo, redisCache),
+		Auth:        controllers.NewAuthMiddleware(jwtManager, repo),
+		Login:       controllers.NewAuthController(repo, jwtManager),
+		Products:    controllers.NewProductController(repo, redisCache),
+		Network:     controllers.NewNetworkController(repo, redisCache, cfg.NetworkRootEmail),
+		Checkout:    controllers.NewCheckoutController(repo, redisCache, networkCache, commissions, cfg.CheckoutCommitDelay),
+		Orders:      controllers.NewOrderController(repo, redisCache, networkCache),
+		Commissions: controllers.NewCommissionController(repo),
+		Payouts:     controllers.NewPayoutController(repo),
+		Reports:     controllers.NewReportController(repo, cfg.Location),
+		Users:       controllers.NewUserController(repo, networkCache),
+		Health:      controllers.NewHealthController(repo, redisCache),
 	}
 
 	// Instanciamos una nueva aplicación de Fiber y la guardamos en la variable 'app'.
@@ -101,6 +113,9 @@ func main() {
 		// Permitimos que el frontend lea X-Cache (HIT/MISS/BYPASS): sin esto CORS la oculta a JavaScript.
 		ExposeHeaders: "X-Cache",
 	}))
+
+	// Detalle técnico de los errores solo en desarrollo (APP_ENV=dev).
+	app.Use(controllers.ErrorDetails(cfg.IsDev()))
 
 	routes.SetupRoutes(app, ctrls)
 

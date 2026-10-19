@@ -25,6 +25,13 @@ var ErrSimulatedFailure = errors.New("falla simulada: caída del sistema a mitad
 // Si cualquier paso falla se hace ROLLBACK: no queda ni pedido ni stock descontado.
 // Las fallas simuladas (CHECKOUT_FAIL_AT / CHECKOUT_COMMIT_DELAY) se inyectan aquí.
 func (r *Repository) CreateOrder(ctx context.Context, userID int, req models.CreateOrderRequest) (*models.Order, error) {
+	// Defensa en profundidad: el controlador ya valida, pero el repositorio no confía
+	// en su llamador (una cantidad negativa sumaría stock en lugar de descontarlo).
+	for _, it := range req.Items {
+		if it.Quantity <= 0 {
+			return nil, &DomainError{Kind: ErrInvalidQuantity, Detail: fmt.Sprintf("producto %d", it.ProductID), Public: true}
+		}
+	}
 	items := mergeItems(req.Items)
 
 	tx, err := r.db.BeginTx(ctx, nil)
@@ -41,7 +48,7 @@ func (r *Repository) CreateOrder(ctx context.Context, userID int, req models.Cre
 		`SELECT active FROM users WHERE id = $1`, userID,
 	).Scan(&active)
 	if errors.Is(err, sql.ErrNoRows) || (err == nil && !active) {
-		return nil, &DomainError{Kind: ErrInvalidRef, Detail: "usuario inexistente o inactivo"}
+		return nil, &DomainError{Kind: ErrInvalidRef, Detail: "usuario inexistente o inactivo", Public: true}
 	}
 	if err != nil {
 		return nil, fmt.Errorf("verificar comprador: %w", err)
@@ -52,11 +59,11 @@ func (r *Repository) CreateOrder(ctx context.Context, userID int, req models.Cre
 	err = tx.QueryRowContext(ctx, `
 		INSERT INTO orders (user_id, payment_method_id, shipping_address, city, phone)
 		SELECT $1, pm.id, $3, $4, $5 FROM payment_methods pm WHERE pm.name = $2
-		RETURNING id, created_at`,
+		RETURNING id, created_at, status`,
 		userID, req.PaymentMethod, req.ShippingAddress, req.City, req.Phone,
-	).Scan(&order.ID, &order.CreatedAt)
+	).Scan(&order.ID, &order.CreatedAt, &order.Status)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, &DomainError{Kind: ErrInvalidRef, Detail: "método de pago inexistente: " + req.PaymentMethod}
+		return nil, &DomainError{Kind: ErrInvalidRef, Detail: "método de pago inexistente: " + req.PaymentMethod, Public: true}
 	}
 	if err != nil {
 		return nil, mapError(err)
@@ -125,14 +132,16 @@ func simulatedFailure(stage string, orderID int) error {
 }
 
 // orderItemError traduce el error de una línea del pedido indicando el producto
-// afectado: stock insuficiente (409) o producto inexistente (422).
+// afectado: stock insuficiente (409), producto dado de baja o inexistente (422).
 func orderItemError(err error, productID int) error {
 	mapped := mapError(err)
 	switch {
 	case errors.Is(mapped, ErrInsufficientStock):
-		return &DomainError{Kind: ErrInsufficientStock, Detail: fmt.Sprintf("producto %d", productID)}
+		return &DomainError{Kind: ErrInsufficientStock, Detail: fmt.Sprintf("producto %d", productID), Public: true}
+	case errors.Is(mapped, ErrProductInactive):
+		return &DomainError{Kind: ErrProductInactive, Detail: fmt.Sprintf("producto %d", productID), Public: true}
 	case errors.Is(mapped, ErrInvalidRef):
-		return &DomainError{Kind: ErrInvalidRef, Detail: fmt.Sprintf("producto %d inexistente", productID)}
+		return &DomainError{Kind: ErrInvalidRef, Detail: fmt.Sprintf("producto %d inexistente", productID), Public: true}
 	default:
 		return mapped
 	}

@@ -1,6 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, PackageSearch, Contact, Store } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import { LayoutDashboard, PackageSearch, Contact, Store, Users, Package, ReceiptText, ClipboardList, Wallet } from 'lucide-react';
+import { useAuth } from '../context/auth';
 import { ICON_SIZES } from '../constants/ui';
 import { ROLE_LABELS } from '../data/constants';
 
@@ -45,11 +45,44 @@ const Sidebar = ({ isOpen, isCollapsed, onCloseSidebar }: SidebarProps) => {
       icon: <PackageSearch size={ICON_SIZES.SIDEBAR} className="flex-shrink-0" />,
     },
     {
+      to: "/my-orders",
+      label: "Mis Pedidos",
+      title: "Mis Pedidos",
+      icon: <ReceiptText size={ICON_SIZES.SIDEBAR} className="flex-shrink-0" />,
+    },
+    {
       to: "/my-network",
       label: "Mi Red",
       title: "Mi Red",
-      adminOnly: true,
       icon: <Contact size={ICON_SIZES.SIDEBAR} className="flex-shrink-0" />,
+    },
+    {
+      to: "/admin/orders",
+      label: "Pedidos",
+      title: "Pedidos",
+      adminOnly: true,
+      icon: <ClipboardList size={ICON_SIZES.SIDEBAR} className="flex-shrink-0" />,
+    },
+    {
+      to: "/admin/payouts",
+      label: "Liquidaciones",
+      title: "Liquidaciones",
+      adminOnly: true,
+      icon: <Wallet size={ICON_SIZES.SIDEBAR} className="flex-shrink-0" />,
+    },
+    {
+      to: "/admin/products",
+      label: "Productos",
+      title: "Productos",
+      adminOnly: true,
+      icon: <Package size={ICON_SIZES.SIDEBAR} className="flex-shrink-0" />,
+    },
+    {
+      to: "/admin/users",
+      label: "Usuarios",
+      title: "Usuarios",
+      adminOnly: true,
+      icon: <Users size={ICON_SIZES.SIDEBAR} className="flex-shrink-0" />,
     },
   ];
 

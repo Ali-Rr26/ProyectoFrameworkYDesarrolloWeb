@@ -50,6 +50,14 @@ services:
       PORT: "4000"
     ports:
       - "${API_PORT:-4000}:4000"
+    # Mismo criterio que el HEALTHCHECK del Dockerfile: GET /api/health con la sonda del binario.
+    # start_period cubre migraciones y conexión inicial antes de contar fallos.
+    healthcheck:
+      test: ["CMD", "/api", "healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     # service_healthy espera a que acepten conexiones, no solo a que el contenedor arranque.
     depends_on:
       postgres:
