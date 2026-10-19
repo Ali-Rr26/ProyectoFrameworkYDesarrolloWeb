@@ -2,6 +2,10 @@
 // Se quita la barra final para que `${API_URL}/api/...` no genere "//api".
 export const API_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:4000').replace(/\/+$/, '');
 
+// Zona horaria del negocio para mostrar fechas y calcular días; debe coincidir con
+// APP_TIMEZONE del backend (los reportes la informan en su respuesta).
+export const BUSINESS_TIMEZONE = import.meta.env.VITE_BUSINESS_TIMEZONE ?? 'America/Guayaquil';
+
 // Porcentaje de comisión que genera cada nivel de la red (1 = referido directo)
 export const COMMISSION_RATES: Record<number, number> = {
   1: 0.10,

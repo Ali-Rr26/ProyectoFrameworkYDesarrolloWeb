@@ -10,6 +10,8 @@ import { orderNumber } from '../data/orders';
 import { ApiError } from '../services/apiClient';
 import { getMyCommissions } from '../services/commissionService';
 import Pagination from './Pagination';
+import { formatDate } from '../data/dates';
+import { BUSINESS_TIMEZONE } from '../data/constants';
 
 const PAGE_SIZE = 10;
 const TOTAL_ORDER: CommissionStatus[] = ['pending', 'paid', 'reversed'];
@@ -61,7 +63,7 @@ const CommissionsPanel = () => {
                       </p>
                       <p className="text-sm text-slate-500">
                         Pedido <span className="font-mono">{orderNumber(c.order_id)}</span> ·{' '}
-                        {new Date(c.created_at).toLocaleDateString('es-EC')}
+                        {formatDate(c.created_at, BUSINESS_TIMEZONE)}
                       </p>
                     </div>
                     <div className="flex items-center gap-3">

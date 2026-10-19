@@ -5,6 +5,8 @@ import type { Payout, PendingDebt } from '../data/payouts';
 import { ApiError } from '../services/apiClient';
 import { createPayout, getPayouts, getPendingDebts } from '../services/payoutService';
 import Pagination from './Pagination';
+import { formatDateTime } from '../data/dates';
+import { BUSINESS_TIMEZONE } from '../data/constants';
 
 const PAGE_SIZE = 10;
 
@@ -116,7 +118,7 @@ const AdminPayouts = () => {
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-slate-800">Pago #{p.id} · {p.beneficiary_name}</p>
                     <p className="text-sm text-slate-500">
-                      {new Date(p.created_at).toLocaleString('es-EC')} · {p.commissions_count} comisión(es)
+                      {formatDateTime(p.created_at, BUSINESS_TIMEZONE)} · {p.commissions_count} comisión(es)
                     </p>
                   </div>
                   <span className="font-bold text-green-600">${p.total.toFixed(2)}</span>

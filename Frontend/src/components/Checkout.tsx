@@ -4,6 +4,8 @@ import { useCart } from '../context/cart';
 import { createOrder, getPaymentMethods } from '../services/orderService';
 import { ApiError } from '../services/apiClient';
 import type { ConfirmedOrder } from './Confirmation';
+import { formatDateTime } from '../data/dates';
+import { BUSINESS_TIMEZONE } from '../data/constants';
 
 interface ShippingData {
   name: string;
@@ -82,7 +84,7 @@ const Checkout = () => {
         })),
         total: created.total,
         customer: { name: shipping.name, email: shipping.email, city: shipping.city },
-        date: new Date(created.created_at).toLocaleString("es-EC"),
+        date: formatDateTime(created.created_at, BUSINESS_TIMEZONE),
       };
 
       // Vaciamos el carrito y pasamos los datos del pedido a la confirmación

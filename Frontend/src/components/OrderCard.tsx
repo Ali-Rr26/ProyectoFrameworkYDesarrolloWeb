@@ -12,6 +12,8 @@ import {
 } from '../data/orders';
 import { ApiError } from '../services/apiClient';
 import { getOrder } from '../services/orderService';
+import { formatDateTime } from '../data/dates';
+import { BUSINESS_TIMEZONE } from '../data/constants';
 
 interface OrderCardProps {
   order: OrderSummary;
@@ -54,7 +56,7 @@ const OrderCard = ({ order, admin = false, busy = false, onChangeStatus }: Order
             Pedido <span className="font-mono">{orderNumber(order.id)}</span>
           </p>
           <p className="text-sm text-slate-500">
-            {new Date(order.created_at).toLocaleString('es-EC')} · {order.items_count} unidad(es)
+            {formatDateTime(order.created_at, BUSINESS_TIMEZONE)} · {order.items_count} unidad(es)
           </p>
           {admin && <p className="text-sm text-slate-500 break-all">{order.buyer_name} · {order.buyer_email}</p>}
         </div>
