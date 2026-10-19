@@ -57,3 +57,13 @@ export const apiFetch = async <T>(path: string, { method = 'GET', body, auth = t
 
   return response.json() as Promise<T>;
 };
+
+// Query string de los listados paginados (?page&limit) con filtros opcionales; los
+// filtros vacíos no se envían (el backend los interpreta como "sin filtro").
+export const listQuery = (page: number, limit: number, filters: Record<string, string | undefined> = {}): string => {
+  const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+  for (const [name, value] of Object.entries(filters)) {
+    if (value) params.set(name, value);
+  }
+  return params.toString();
+};

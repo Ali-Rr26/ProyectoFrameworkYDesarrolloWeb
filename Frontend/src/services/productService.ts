@@ -1,5 +1,6 @@
+import type { Page } from '../data/orders';
 import type { Product, ProductInput, ProductUpdate } from '../data/products';
-import { apiFetch, ApiError } from './apiClient';
+import { apiFetch, ApiError, listQuery } from './apiClient';
 
 // El catálogo es público: no requiere token.
 export const getProducts = (): Promise<Product[]> =>
@@ -21,8 +22,9 @@ export const getCategories = (): Promise<string[]> => apiFetch<string[]>('/api/c
 
 // ===== Solo administrador =====
 
-// Todos los productos, incluidos los dados de baja.
-export const getAdminProducts = (): Promise<Product[]> => apiFetch<Product[]>('/api/admin/products');
+// Productos paginados, incluidos los dados de baja, con búsqueda por nombre o categoría (?q=).
+export const getAdminProducts = (page: number, limit: number, q: string): Promise<Page<Product>> =>
+  apiFetch<Page<Product>>(`/api/admin/products?${listQuery(page, limit, { q })}`);
 
 export const createProduct = (input: ProductInput): Promise<Product> =>
   apiFetch<Product>('/api/products', { method: 'POST', body: input });
