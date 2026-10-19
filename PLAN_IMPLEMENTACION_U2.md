@@ -225,15 +225,20 @@ con `UNIQUE(order_id, level)`; `CommissionService` en goroutine + `RecoverPendin
 
 **Ya existe:** saldo histórico y del mes por beneficiario en `v_user_commissions`.
 
-- [ ] `POST /api/payouts {beneficiary_id}` (admin): transacción con `FOR UPDATE` — suma comisiones `pending`, crea `payouts`, marca `paid` + `payout_id`; sin pendientes → `409` (antes: `POST /api/liquidaciones`)
-- [ ] `GET /api/payouts` (admin): historial de pagos (antes: `/api/liquidaciones`)
-- [ ] `GET /api/payouts/mine`: cobros del distribuidor (antes: `/api/liquidaciones/mias`)
-- [ ] Vista admin `/admin/payouts`: deuda por distribuidor + botón liquidar (antes: `/admin/liquidaciones`)
+- [x] `POST /api/payouts {beneficiary_id}` (admin): transacción con `FOR UPDATE` — suma comisiones `pending`, crea `payouts`, marca `paid` + `payout_id`; sin pendientes → `409`; inexistente → `404` (antes: `POST /api/liquidaciones`)
+- [x] **Regla de negocio:** solo se liquidan comisiones de pedidos **entregados** (la venta ya es definitiva y un pedido entregado no puede cancelarse); las de pedidos en curso figuran en la deuda como "en espera" hasta la entrega
+- [x] Concurrencia: bloquea primero los pedidos entregados (`FOR SHARE`) y luego las comisiones (`FOR UPDATE`), en el mismo orden que el cambio de estado — dos liquidaciones simultáneas nunca pagan doble
+- [x] `GET /api/payouts` (admin): historial de pagos paginado, con beneficiario y cantidad de comisiones (antes: `/api/liquidaciones`)
+- [x] `GET /api/payouts/mine`: cobros del distribuidor, paginado (antes: `/api/liquidaciones/mias`)
+- [ ] Panel "Mis cobros" en `/my-network` (agregado al plan): cada liquidación recibida con fecha, monto y comisiones cubiertas, paginado — implementado (`PayoutsPanel.tsx`, consume `GET /api/payouts/mine`); falta verificación en navegador
+- [ ] Vista admin `/admin/payouts`: deuda por distribuidor + botón liquidar (antes: `/admin/liquidaciones`) — implementada (`AdminPayouts.tsx` con confirmación e historial paginado, "Liquidaciones" en el sidebar); falta verificación en navegador
 
 **Verificación**
 
-- [ ] Liquidar → comisiones `paid`; segunda liquidación → `409` (no paga doble)
-- [ ] Suma de comisiones `pending` del beneficiario = 0 tras liquidar
+- [x] Liquidar → comisiones `paid`; segunda liquidación → `409` (no paga doble)
+- [x] Dos liquidaciones simultáneas → una `201` y otra `409`; cancelar un pedido sin entregar mientras se liquida nunca paga su comisión (4 ejecuciones del escenario, sin deadlocks)
+- [x] La deuda separa lo listo para liquidar (pedidos entregados) de lo que está en espera; al entregar un pedido su comisión pasa a liquidable; ningún pago incluye comisiones de pedidos sin entregar
+- [x] Tras liquidar no quedan comisiones `pending` de pedidos entregados del beneficiario (las de pedidos en curso siguen pendientes; el saldo de `v_user_commissions` no cambia)
 
 ---
 
@@ -248,7 +253,7 @@ las agregaciones.
 - [ ] `GET /api/reports/summary?from&to`: total vendido, nº pedidos, ticket promedio, comisiones devengadas (sin cancelados) (antes: `/api/reportes/ventas`)
 - [ ] `GET /api/reports/top-products` (`SUM(quantity × unit_price) GROUP BY product`) (antes: `/api/reportes/top-productos`)
 - [ ] `GET /api/reports/top-sponsors` (ventas de la red por patrocinador) (antes: `/api/reportes/top-referidos`)
-- [ ] `GET /api/reports/pending-commissions` (deuda por distribuidor) (antes: `/api/reportes/comisiones`)
+- [x] `GET /api/reports/pending-commissions` (deuda por distribuidor: lista para liquidar y en espera) (antes: `/api/reportes/comisiones`) — adelantado en la Fase 6: lo usa la vista de liquidaciones
 - [ ] Dashboard admin consume los reportes (carga + estado vacío)
 
 **Verificación**
@@ -286,8 +291,8 @@ errores por campo.
 | 3 | CRUD productos (edición + baja lógica) | 🟡 Backend verificado; vistas implementadas, falta recorrido en navegador |
 | 4 | Pedidos: consulta, estados, cancelación ACID | ✅ Implementada y verificada |
 | 5 | Comisiones del distribuidor + red visible al cliente | 🟡 Backend verificado; vistas implementadas, falta recorrido en navegador |
-| 6 | Liquidaciones | ⏳ Pendiente (base: `v_user_commissions`) |
-| 7 | Reportes + Dashboard real | ⏳ Pendiente (base: vistas SQL) |
+| 6 | Liquidaciones | 🟡 Backend verificado; vista implementada, falta recorrido en navegador |
+| 7 | Reportes + Dashboard real | ⏳ Pendiente (base: vistas SQL; `pending-commissions` ya hecho) |
 | 8 | Paginación + `?q=` + auditoría | ⏳ Pendiente |
 
 > Con 0–5 el sistema **vende, afilia por código, gestiona pedidos y traza comisiones**:

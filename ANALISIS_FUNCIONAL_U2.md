@@ -121,6 +121,13 @@ crece con cada registro que trae `sponsor_id`. Un MLM real necesita que se afili
 | Backend | `GET /api/commissions/mine` (cliente/distribuidor) (antes: `/api/comisiones/mias`), `POST /api/payouts` (admin marca comisiones `pending→paid`) (antes: `/api/liquidaciones`). Estados: `pending`, `paid`, `reversed`. |
 | Datos | Tabla `payouts(id, beneficiary_id, total, created_at)` + `commissions.payout_id` nullable (antes: `liquidaciones`, `comisiones.liquidacion_id`). |
 
+> **Regla de negocio (liquidación):** una comisión se puede pagar solo cuando el pedido
+> que la generó fue **entregado**: recién entonces la venta es definitiva y el pedido ya no
+> puede cancelarse. Mientras el pedido está pendiente, en preparación o enviado, la comisión
+> figura en la deuda del distribuidor como "en espera"; si el pedido se cancela, se revierte
+> sin haberse pagado. Ningún comprador gana comisiones por sus propias compras: las ganan
+> sus patrocinadores (niveles 1 a 3).
+
 ### 3.6 Reportes y KPIs reales — 🟠 ALTO
 
 El Dashboard calcula sus KPIs en el navegador a partir de la red, no del negocio.
