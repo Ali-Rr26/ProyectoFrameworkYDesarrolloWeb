@@ -14,4 +14,7 @@ FROM alpine:3.20
 RUN apk add --no-cache ca-certificates
 COPY --from=build /api /api
 EXPOSE 4000
+# Sonda incluida en el binario (`/api healthcheck` -> GET /api/health en $PORT): no depende
+# de curl/wget. Unhealthy solo si PostgreSQL cae (503); Redis caído = "degraded" = sano.
+HEALTHCHECK --interval=10s --timeout=5s --start-period=20s --retries=3 CMD ["/api", "healthcheck"]
 ENTRYPOINT ["/api"]

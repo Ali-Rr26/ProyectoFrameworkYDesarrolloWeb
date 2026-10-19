@@ -19,6 +19,9 @@ type Config struct {
 	RedisURL string
 	// Port es el puerto HTTP donde escucha Fiber.
 	Port string
+	// AppEnv es el entorno de ejecución: "dev" expone el detalle técnico de los errores
+	// (APIError.Details); cualquier otro valor (por defecto "production") lo oculta.
+	AppEnv string
 	// CORSOrigin es el origen permitido para el frontend.
 	CORSOrigin string
 	// NetworkRootEmail es la raíz por defecto de GET /api/network cuando consulta un admin.
@@ -27,6 +30,9 @@ type Config struct {
 	JWTSecret string
 	// JWTTTL es la vigencia de cada token emitido.
 	JWTTTL time.Duration
+	// Location es la zona horaria del negocio (APP_TIMEZONE, por defecto America/Guayaquil):
+	// los reportes interpretan sus fechas en ella, no en la del servidor (UTC en Docker).
+	Location *time.Location
 	// CheckoutFailAt activa una falla simulada en la transacción del checkout para
 	// demostrar el ROLLBACK en clase ("" desactivada, "after_order" o "after_items").
 	CheckoutFailAt string
@@ -34,6 +40,23 @@ type Config struct {
 	// detener el contenedor de PostgreSQL a mitad de la compra (0 desactivada).
 	CheckoutCommitDelay time.Duration
 }
+
+// DefaultTimezone es la zona horaria del negocio cuando no se define APP_TIMEZONE.
+const DefaultTimezone = "America/Guayaquil"
+
+// DefaultPort es el puerto HTTP cuando no se define PORT.
+const DefaultPort = "4000"
+
+// Entornos de APP_ENV.
+const (
+	// EnvDev expone el detalle técnico de los errores para depurar.
+	EnvDev = "dev"
+	// EnvProduction es el valor por defecto: los errores no revelan detalles internos.
+	EnvProduction = "production"
+)
+
+// IsDev indica si la aplicación corre en modo desarrollo.
+func (c *Config) IsDev() bool { return c.AppEnv == EnvDev }
 
 // Etapas válidas de CHECKOUT_FAIL_AT.
 const (
@@ -48,9 +71,14 @@ func Load() (*Config, error) {
 	// Si no existe .env no es un error: las variables pueden venir del sistema operativo.
 	_ = godotenv.Load()
 
-	ttl, err := time.ParseDuration(getEnv("JWT_TTL", "8h"))
+	ttl, err := time.ParseDuration(getEnv("JWT_TTL", "2h"))
 	if err != nil {
 		return nil, fmt.Errorf("JWT_TTL inválido: %w", err)
+	}
+
+	loc, err := time.LoadLocation(getEnv("APP_TIMEZONE", DefaultTimezone))
+	if err != nil {
+		return nil, fmt.Errorf("APP_TIMEZONE inválida: %w", err)
 	}
 
 	commitDelay, err := time.ParseDuration(getEnv("CHECKOUT_COMMIT_DELAY", "0s"))
@@ -65,11 +93,13 @@ func Load() (*Config, error) {
 	cfg := &Config{
 		DatabaseURL:      os.Getenv("DATABASE_URL"),
 		RedisURL:         getEnv("REDIS_URL", "redis://localhost:6379/0"),
-		Port:             getEnv("PORT", "4000"),
+		Port:             getEnv("PORT", DefaultPort),
+		AppEnv:           getEnv("APP_ENV", EnvProduction),
 		CORSOrigin:       getEnv("CORS_ORIGIN", "http://localhost:5175"),
 		NetworkRootEmail: getEnv("NETWORK_ROOT_EMAIL", "cliente@upse.edu.ec"),
 		JWTSecret:        os.Getenv("JWT_SECRET"),
 		JWTTTL:           ttl,
+		Location:         loc,
 
 		CheckoutFailAt:      failAt,
 		CheckoutCommitDelay: commitDelay,

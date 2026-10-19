@@ -1,7 +1,7 @@
 // src/components/Login.tsx
 import { useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/auth';
 import { apiFetch, ApiError } from '../services/apiClient';
 
 // Respuesta de POST /api/login
@@ -13,7 +13,9 @@ interface LoginResponse {
 }
 
 const Login = () => {
-  const [email, setEmail] = useState<string>('');
+  // Al volver del registro llega el correo de la cuenta nueva: se muestra un aviso y se precarga.
+  const registeredEmail = (useLocation().state as { registeredEmail?: string } | null)?.registeredEmail;
+  const [email, setEmail] = useState<string>(registeredEmail ?? '');
   const [password, setPassword] = useState<string>('');
   const [error, setError] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
@@ -57,6 +59,12 @@ const Login = () => {
           <p className="text-slate-500 mt-2">Ingresa a tu cuenta para continuar</p>
         </div>
 
+        {registeredEmail && !error && (
+          <div className="bg-green-50 text-green-700 p-3 rounded-lg text-sm mb-6 text-center border border-green-200">
+            Cuenta creada. Inicia sesión para continuar.
+          </div>
+        )}
+
         {error && (
           <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm mb-6 text-center border border-red-200">
             {error}
@@ -96,6 +104,12 @@ const Login = () => {
             {loading ? 'Validando...' : 'Iniciar Sesión'}
           </button>
         </form>
+        <p className="mt-6 text-center text-sm text-slate-600">
+          ¿No tienes cuenta?{' '}
+          <Link to="/register" className="inline-flex items-center min-h-11 font-semibold text-[#20b2aa] hover:text-[#008080]">
+            Crear cuenta
+          </Link>
+        </p>
         <div className="mt-6 p-4 bg-slate-50 rounded-lg border border-slate-200 text-xs text-slate-600 space-y-1">
           <p className="font-semibold text-slate-700">Cuentas de prueba:</p>
           <p>👑 Admin: <span className="font-mono">admin@upse.edu.ec / 123456</span></p>

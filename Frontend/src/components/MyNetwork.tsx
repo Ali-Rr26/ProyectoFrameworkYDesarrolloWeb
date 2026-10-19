@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react';
 import { countNetwork, sumNetworkSales, getMonthlyCommissions, getRank, type NetworkNode } from '../data/network';
 import { getNetwork } from '../services/networkService';
+import { ApiError } from '../services/apiClient';
 import { COMMISSION_RATES, LEVEL_STYLES } from '../data/constants';
+import InviteLink from './InviteLink';
+import CommissionsPanel from './CommissionsPanel';
+import PayoutsPanel from './PayoutsPanel';
 
 // Componente recursivo: renderiza un referido y, debajo, a sus hijos
 const NetworkNodeItem = ({ node }: { node: NetworkNode }) => {
@@ -33,7 +37,7 @@ const NetworkNodeItem = ({ node }: { node: NetworkNode }) => {
 
       {/* Hijos del referido (más profundidad en el árbol) */}
       {node.children && node.children.length > 0 && (
-        <ul className="mt-3 ml-6 space-y-3 border-l-2 border-slate-200 pl-4">
+        <ul className="mt-3 ml-3 sm:ml-6 space-y-3 border-l-2 border-slate-200 pl-3 sm:pl-4">
           {node.children.map((child) => (
             <NetworkNodeItem key={child.id} node={child} />
           ))}
@@ -46,20 +50,34 @@ const NetworkNodeItem = ({ node }: { node: NetworkNode }) => {
 const MyNetwork = () => {
   const [network, setNetwork] = useState<NetworkNode | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>('');
 
   useEffect(() => {
     getNetwork()
-      .then(data => {
-        setNetwork(data);
-        setLoading(false);
+      .then(setNetwork)
+      .catch((err) => {
+        // 404: la cuenta no está afiliada a la red (p. ej. el admin sin red configurada)
+        if (err instanceof ApiError && err.status === 404) {
+          setError('Tu cuenta todavía no forma parte de la red de referidos.');
+        } else {
+          setError(err instanceof ApiError ? err.message : 'No se pudo cargar la red');
+        }
       })
-      .catch(err => {
-        console.error('Error cargando red:', err);
-        setLoading(false);
-      });
+      .finally(() => setLoading(false));
   }, []);
 
-  if (loading || !network) return <div className="text-center p-8">Cargando red...</div>;
+  if (loading) return <div className="text-center p-8">Cargando red...</div>;
+  if (error || !network) {
+    return (
+      <div className="bg-white p-10 rounded-lg border border-slate-200 text-center text-slate-500">
+        {error || 'No se pudo cargar la red'}
+      </div>
+    );
+  }
+
+  // El backend nombra "Tú" a la raíz cuando es la red de quien consulta: solo entonces se
+  // muestran su link de invitación y su ledger (un admin que mira otra red no los ve).
+  const isOwnNetwork = network.name === 'Tú';
 
   // KPIs derivados de los datos de la red (funciones puras en data/network.ts)
   const activeReferrals = countNetwork(network);
@@ -80,6 +98,8 @@ const MyNetwork = () => {
       <p className="text-slate-500 mb-6">
         Estructura multinivel: gana el {COMMISSION_RATES[1] * 100} % de nivel 1, {COMMISSION_RATES[2] * 100} % de nivel 2 y {COMMISSION_RATES[3] * 100} % de nivel 3.
       </p>
+
+      {isOwnNetwork && network.referral_code && <InviteLink referralCode={network.referral_code} />}
 
       {/* ===== TARJETAS DE RESUMEN ===== */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -116,7 +136,13 @@ const MyNetwork = () => {
             <NetworkNodeItem key={child.id} node={child} />
           ))}
         </ul>
+        {(network.children?.length ?? 0) === 0 && (
+          <p className="text-slate-500 text-sm">Todavía no tienes referidos. Comparte tu link de invitación para hacer crecer tu red.</p>
+        )}
       </div>
+
+      {isOwnNetwork && <CommissionsPanel />}
+      {isOwnNetwork && <PayoutsPanel />}
     </div>
   );
 };

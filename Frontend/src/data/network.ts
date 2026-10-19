@@ -14,7 +14,8 @@ export interface NetworkNode {
   sales: number;
   // Comisión que las compras de este miembro ya le pagaron a la raíz
   commission: number;
-  // Solo en la raíz
+  // Solo en la raíz: código para invitar (/register?ref=CODIGO) y saldo de comisiones
+  referral_code?: string;
   summary?: NetworkSummary;
   children?: NetworkNode[];
 }

@@ -79,3 +79,14 @@ func (h *AuthController) Login(c *fiber.Ctx) error {
 		"expires_at": exp,
 	})
 }
+
+// Me devuelve la cuenta autenticada (GET /api/me, requiere JWT). El frontend la consulta
+// al cargar la app: si la cuenta fue desactivada, RequireAuth responde 401 y se cierra
+// la sesión; si cambió el rol, la interfaz toma el vigente.
+func (h *AuthController) Me(c *fiber.Ctx) error {
+	user := currentUser(c)
+	if user == nil {
+		return apiError(c, fiber.StatusUnauthorized, "Token requerido", nil)
+	}
+	return c.JSON(user)
+}
