@@ -250,15 +250,18 @@ con `UNIQUE(order_id, level)`; `CommissionService` en goroutine + `RecoverPendin
 **Ya existe:** vistas `v_order_totals`, `v_user_sales`, `v_user_commissions` como base de
 las agregaciones.
 
-- [ ] `GET /api/reports/summary?from&to`: total vendido, nº pedidos, ticket promedio, comisiones devengadas (sin cancelados) (antes: `/api/reportes/ventas`)
-- [ ] `GET /api/reports/top-products` (`SUM(quantity × unit_price) GROUP BY product`) (antes: `/api/reportes/top-productos`)
-- [ ] `GET /api/reports/top-sponsors` (ventas de la red por patrocinador) (antes: `/api/reportes/top-referidos`)
+- [x] `GET /api/reports/summary?from&to`: total vendido, nº pedidos, ticket promedio, comisiones devengadas (sin cancelados), más pedidos cancelados y nuevos afiliados (antes: `/api/reportes/ventas`)
+- [x] Periodo: `?range=last_30_days` (por defecto) | `month_to_date` | `today`, o rango personalizado `?from=AAAA-MM-DD&to=AAAA-MM-DD` (ambos días completos, "to" vacío = hoy, máximo un año); resuelto con funciones puras (`resolveRange`, `parseDateRange`) y devuelto en la respuesta (`range`, `from`, `to`, `timezone`) e interpretado en la zona horaria del negocio (`APP_TIMEZONE`, por defecto `America/Guayaquil`): un pedido de la noche en Ecuador ya es el día siguiente en UTC y sin esto quedaba fuera del reporte; probado con días de 23 y 25 h por cambio de horario
+- [x] Índice `orders(created_at)` (migración `0005_orders_created_index.sql`): los reportes por rango de fecha usan `Index Only Scan`
+- [x] `GET /api/reports/top-products` (`SUM(quantity × unit_price) GROUP BY product`, sin cancelados, `?limit` 1–20) (antes: `/api/reportes/top-productos`)
+- [x] `GET /api/reports/top-sponsors` (ventas de la red por patrocinador, niveles 1–3, a partir del ledger de comisiones no revertidas) (antes: `/api/reportes/top-referidos`)
 - [x] `GET /api/reports/pending-commissions` (deuda por distribuidor: lista para liquidar y en espera) (antes: `/api/reportes/comisiones`) — adelantado en la Fase 6: lo usa la vista de liquidaciones
-- [ ] Dashboard admin consume los reportes (carga + estado vacío)
+- [ ] Dashboard admin consume los reportes (carga + estado vacío) — implementado (`Dashboard.tsx`: selector Últimos 30 días / Este mes / Hoy / Personalizado con las fechas siempre cargadas, Restablecer, periodo en la URL y línea con el periodo aplicado y su zona horaria; 6 KPIs, comisiones por liquidar, top productos y top patrocinadores); falta verificación en navegador
+- [x] Fechas de pedidos, comisiones y pagos mostradas en la zona del negocio (`data/dates.ts` con `Intl.DateTimeFormat`, `VITE_BUSINESS_TIMEZONE`)
 
 **Verificación**
 
-- [ ] Los KPIs coinciden con `SELECT SUM(total) FROM v_order_totals` del periodo
+- [x] Los KPIs coinciden con `SELECT SUM(total) FROM v_order_totals` del periodo; la suma de ingresos por producto = total vendido; un pedido cancelado deja de contar
 
 ---
 
@@ -292,7 +295,7 @@ errores por campo.
 | 4 | Pedidos: consulta, estados, cancelación ACID | ✅ Implementada y verificada |
 | 5 | Comisiones del distribuidor + red visible al cliente | 🟡 Backend verificado; vistas implementadas, falta recorrido en navegador |
 | 6 | Liquidaciones | 🟡 Backend verificado; vista implementada, falta recorrido en navegador |
-| 7 | Reportes + Dashboard real | ⏳ Pendiente (base: vistas SQL; `pending-commissions` ya hecho) |
+| 7 | Reportes + Dashboard real | 🟡 Backend verificado; Dashboard implementado, falta recorrido en navegador |
 | 8 | Paginación + `?q=` + auditoría | ⏳ Pendiente |
 
 > Con 0–5 el sistema **vende, afilia por código, gestiona pedidos y traza comisiones**:
