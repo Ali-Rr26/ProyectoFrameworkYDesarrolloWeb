@@ -72,16 +72,15 @@ function App() {
             {/* Rutas protegidas (requieren login) */}
             <Route element={<ProtectedRoute />}>
               <Route path="/" element={<Layout />}>
-                {/* Solo administrador: Dashboard y Red multinivel */}
+                {/* Solo administrador: Dashboard y paneles de gestión */}
                 <Route element={<AdminRoute />}>
                   <Route index element={<Dashboard />} />
-                  <Route path="my-network" element={<MyNetwork />} />
                   <Route path="admin/users" element={<AdminUsers />} />
                   <Route path="admin/products" element={<AdminProducts />} />
                   <Route path="admin/orders" element={<AdminOrders />} />
                 </Route>
 
-                {/* Ambos roles: flujo de compra en línea */}
+                {/* Ambos roles: compra, pedidos y red de referidos */}
                 <Route path="store" element={<Storefront />} />
                 <Route path="catalog" element={<Catalog />} />
                 <Route path="product/:id" element={<ProductDetail />} />
@@ -89,6 +88,7 @@ function App() {
                 <Route path="checkout" element={<Checkout />} />
                 <Route path="confirmation" element={<Confirmation />} />
                 <Route path="my-orders" element={<MyOrders />} />
+                <Route path="my-network" element={<MyNetwork />} />
               </Route>
             </Route>
 

@@ -54,7 +54,6 @@ const Sidebar = ({ isOpen, isCollapsed, onCloseSidebar }: SidebarProps) => {
       to: "/my-network",
       label: "Mi Red",
       title: "Mi Red",
-      adminOnly: true,
       icon: <Contact size={ICON_SIZES.SIDEBAR} className="flex-shrink-0" />,
     },
     {
