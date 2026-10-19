@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, PackageSearch, Contact, Store, Users, Package, ReceiptText, ClipboardList } from 'lucide-react';
+import { LayoutDashboard, PackageSearch, Contact, Store, Users, Package, ReceiptText, ClipboardList, Wallet } from 'lucide-react';
 import { useAuth } from '../context/auth';
 import { ICON_SIZES } from '../constants/ui';
 import { ROLE_LABELS } from '../data/constants';
@@ -62,6 +62,13 @@ const Sidebar = ({ isOpen, isCollapsed, onCloseSidebar }: SidebarProps) => {
       title: "Pedidos",
       adminOnly: true,
       icon: <ClipboardList size={ICON_SIZES.SIDEBAR} className="flex-shrink-0" />,
+    },
+    {
+      to: "/admin/payouts",
+      label: "Liquidaciones",
+      title: "Liquidaciones",
+      adminOnly: true,
+      icon: <Wallet size={ICON_SIZES.SIDEBAR} className="flex-shrink-0" />,
     },
     {
       to: "/admin/products",

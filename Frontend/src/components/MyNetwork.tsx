@@ -5,6 +5,7 @@ import { ApiError } from '../services/apiClient';
 import { COMMISSION_RATES, LEVEL_STYLES } from '../data/constants';
 import InviteLink from './InviteLink';
 import CommissionsPanel from './CommissionsPanel';
+import PayoutsPanel from './PayoutsPanel';
 
 // Componente recursivo: renderiza un referido y, debajo, a sus hijos
 const NetworkNodeItem = ({ node }: { node: NetworkNode }) => {
@@ -141,6 +142,7 @@ const MyNetwork = () => {
       </div>
 
       {isOwnNetwork && <CommissionsPanel />}
+      {isOwnNetwork && <PayoutsPanel />}
     </div>
   );
 };

@@ -14,6 +14,7 @@ import Register from './components/Register';
 import AdminUsers from './components/AdminUsers';
 import AdminProducts from './components/AdminProducts';
 import AdminOrders from './components/AdminOrders';
+import AdminPayouts from './components/AdminPayouts';
 import MyOrders from './components/MyOrders';
 import { CartProvider } from './context/CartContext';
 import { AuthProvider } from './context/AuthContext';
@@ -78,6 +79,7 @@ function App() {
                   <Route path="admin/users" element={<AdminUsers />} />
                   <Route path="admin/products" element={<AdminProducts />} />
                   <Route path="admin/orders" element={<AdminOrders />} />
+                  <Route path="admin/payouts" element={<AdminPayouts />} />
                 </Route>
 
                 {/* Ambos roles: compra, pedidos y red de referidos */}
