@@ -59,9 +59,11 @@ Nombre del paquete: `multicatalogo-frontend`. URL de la API en `VITE_API_URL` (`
 | `services/apiClient.ts` | Cliente HTTP único (GET/POST/PUT/PATCH/DELETE): `apiFetch` con `Authorization: Bearer` automático, `ApiError{status, message, details}`, `setAuthToken`, `setUnauthorizedHandler`. |
 | `services/productService.ts` | `getProducts()`, `getProductById()` → `GET /api/products[/:id]`; `getCategories()` → `GET /api/categories`; admin: `getAdminProducts()`, `createProduct()`, `updateProduct()` (PUT), `deactivateProduct()` (DELETE). |
 | `services/networkService.ts` | `getNetwork()` → `GET /api/network` (JWT). |
+| `services/commissionService.ts` | `getMyCommissions()` → `GET /api/commissions/mine` (paginado, con totales). |
 | `services/userService.ts` | `registerUser()` → `POST /api/users` (público); `getMe()` → `GET /api/me`; `getUsers()` → `GET /api/users`; `updateUser()` → `PATCH /api/users/:id` (admin). |
 | `services/orderService.ts` | `createOrder()` → `POST /api/checkout`; `getPaymentMethods()`; `getMyOrders()`, `getOrder()`; admin: `getOrders()`, `updateOrderStatus()`. |
 | `data/products.ts` | Tipos `Product` (incluye `stock`, `gallery`, `active`), `ProductInput`, `ProductUpdate`. |
+| `data/commissions.ts` | Tipos `CommissionEntry`, `CommissionLedger`; etiquetas y estilos de estado; función pura `inviteLink`. |
 | `data/orders.ts` | Tipos `OrderSummary`, `OrderDetail`, `Page<T>`; etiquetas y estilos de estado; función pura `nextStatuses` (mismas transiciones que el backend). |
 | `data/users.ts` | Tipos `UserAccount`, `RegisterPayload`, `UpdateUserPayload`. |
 | `data/validation.ts` | Funciones puras `isValidEmail`, `PASSWORD_RULES`, `isStrongPassword` (misma lógica que `controllers/validation.go`). |
@@ -81,7 +83,9 @@ Nombre del paquete: `multicatalogo-frontend`. URL de la API en `VITE_API_URL` (`
 | `components/AdminOrders.tsx` | `/admin/orders` (**solo admin**) — todos los pedidos, filtro por estado y cambio de estado (cancelar pide confirmación). |
 | `components/OrderCard.tsx`, `Pagination.tsx` | Tarjeta de pedido (detalle al expandir, acciones del admin) y paginación reutilizables. |
 | `components/Dashboard.tsx` | `/` (**solo admin**) — KPIs calculados en el cliente sobre `GET /api/network`. |
-| `components/MyNetwork.tsx` | `/my-network` (**solo admin**) — árbol multinivel, comisión por nodo y `summary`. |
+| `components/MyNetwork.tsx` | `/my-network` (todos los roles) — árbol multinivel, comisión por nodo y `summary`; en la red propia, link de invitación y panel de comisiones; aviso si la cuenta no está afiliada. |
+| `components/InviteLink.tsx` | Código de referido y link `/register?ref=CODIGO` con botón copiar. |
+| `components/CommissionsPanel.tsx` | "Mis comisiones": totales por estado y ledger paginado. |
 | `components/AdminProducts.tsx` | `/admin/products` (**solo admin**) — todos los productos (activos e inactivos); crear, editar, dar de baja y reactivar con confirmación. |
 | `components/ProductForm.tsx` | Formulario de alta/edición de productos (un campo por fila; categorías desde la API; galería como una URL por línea). |
 | `components/AdminUsers.tsx` | `/admin/users` (**solo admin**) — cuentas con rol, estado, código y patrocinador; cambio de rol y activar/desactivar (no sobre la propia cuenta). |
@@ -108,10 +112,11 @@ Capas: `routes` → `controllers` (structs con interfaces de `ports.go`) → `se
 | `database/migrations/0002_seed.sql` | Seed: 9 usuarios (contraseña `123456`, bcrypt vía `crypt()`), red, productos, pedidos. |
 | `database/migrations/0003_commissions.sql` | `commission_rates` (10/5/2 %), ledger `commissions` (`UNIQUE(order_id, level)`), vista `v_user_commissions`, comisiones del seed. |
 | `database/migrations/0004_backoffice.sql` | Base del back-office: `network_members.referral_code` (generado por trigger), `products.active` (baja lógica; el trigger de stock rechaza inactivos), `orders.status` (`pending`…`cancelled`), `commissions.status` + `payout_id`, tabla `payouts`; `v_user_commissions` excluye revertidas. |
+| `models/commissions.go` | `CommissionEntry`, `CommissionTotals`, `CommissionLedger` (página + totales). |
 | `models/orders.go` | Estados del pedido y reglas puras de transición (`OrderTransitionAllowed`, `NextOrderStatuses`), `Page[T]`, `OrderSummary`, `OrderDetail`, `OrderFilter`. |
 | `models/models.go` | `LoginRequest`, `Product`, `ProductInput`, `ProductUpdate`, `User` (hash con `json:"-"`), `RegisterRequest` (`sponsor_id` o `referral_code`), `UpdateUserRequest`, `NetworkNode` (con `referral_code`)/`NetworkSummary`, `CreateOrderRequest`/`OrderItemInput`, `Order`/`OrderItem`, `PendingCommission`, `APIError`. |
 | `routes/routes.go` | `SetupRoutes(app, Controllers)`; middleware por ruta (públicas nunca pasan por auth). |
-| `controllers/ports.go` | Interfaces por consumidor: `ProductRepository`, `NetworkRepository`, `OrderRepository`, `UserRepository`, `CredentialRepository`, `Pinger`, `OrderQueryRepository`, `AccountLookup`, `TokenIssuer`, `TokenParser`, `NetworkInvalidator`, `CommissionProcessor`. |
+| `controllers/ports.go` | Interfaces por consumidor: `ProductRepository`, `NetworkRepository`, `OrderRepository`, `UserRepository`, `CredentialRepository`, `Pinger`, `OrderQueryRepository`, `CommissionQueryRepository`, `AccountLookup`, `TokenIssuer`, `TokenParser`, `NetworkInvalidator`, `CommissionProcessor`. |
 | `controllers/middleware.go` | `AuthMiddleware.RequireAuth` (Bearer → verifica en la base que la cuenta siga activa y toma su rol vigente → claims y cuenta en `Locals`) y `RequireRole(...)`. |
 | `controllers/validation.go` | Funciones puras `validEmail`, `passwordProblems` (contraseña fuerte), `validateProductInput` y `validateProductUpdate`. |
 | `controllers/helpers.go` | `apiError`, `pagination` (`?page`, `?limit` 1–50), `repoError` (errores de dominio → 400/404/409/422/503/500; detalle técnico solo con `APP_ENV=dev`), middleware `ErrorDetails`, `dbCtx` (timeout 5 s). |
@@ -119,14 +124,15 @@ Capas: `routes` → `controllers` (structs con interfaces de `ports.go`) → `se
 | `controllers/productController.go` | Catálogo público con Cache-Aside `productos:all` (5 min, solo activos), `GET /api/categories`; admin: listado completo, `POST`, `PUT` (edición parcial/reactivación) y `DELETE` (baja lógica), invalidando la caché. |
 | `controllers/networkController.go` | `GET /api/network` — red del token (admin: `?user_id=` o `NETWORK_ROOT_EMAIL`); Cache-Aside `red:tree:{email}` (10 min); "Tú" se personaliza tras la caché. |
 | `controllers/checkoutController.go` | `POST /api/checkout` (+ alias `/api/orders`) y `GET /api/payment-methods`; comprador del JWT; cantidad ≤0 → 400 propio; tras COMMIT invalida caché y lanza comisiones. |
+| `controllers/commissionController.go` | `GET /api/commissions/mine` — ledger del usuario del token. |
 | `controllers/orderController.go` | `GET /api/orders/mine`, `GET /api/orders/:id` (dueño o admin), `GET /api/orders` y `PATCH /api/orders/:id/status` (admin; al cancelar invalida catálogo y red del comprador). |
 | `controllers/userController.go` | `POST /api/users` (registro público; patrocinador por `sponsor_id` o `referral_code`; siempre queda afiliado), `GET /api/users` y `PATCH /api/users/:id` (admin: rol y `active`, nunca sobre sí mismo). |
 | `controllers/healthController.go` | `GET /api/health` (ping a ambas dependencias: `ok`, `degraded` si cae Redis, 503 si cae PostgreSQL), `/api/health/db` y `/api/health/redis` (503 si cae). |
-| `repository/` | Única capa con SQL: `products.go` (catálogo activo, listado admin, edición con bloqueo de fila, baja lógica, categorías), `users.go` (alta con afiliación, `UpdateUser`, `GetUserByID`), `network.go` (árbol `WITH RECURSIVE` + upline; comisiones sin revertidas), `orders.go` (transacción ACID + fallas simuladas), `order_queries.go` (listado paginado, detalle, cambio de estado y cancelación ACID), `commissions.go` (inserción recursiva idempotente bajo `FOR SHARE` del pedido; ignora cancelados), `catalogs.go`, `errors.go` (SQLSTATE → `ErrNotFound`, `ErrDuplicate`, `ErrInvalidRef`, `ErrConstraint`, `ErrInsufficientStock`, `ErrInvalidQuantity`, `ErrProductInactive`, `ErrInvalidReferral`, `ErrInvalidTransition`, `ErrCommissionsPaid`; `DomainError.Public` marca el detalle apto para el usuario). |
+| `repository/` | Única capa con SQL: `products.go` (catálogo activo, listado admin, edición con bloqueo de fila, baja lógica, categorías), `users.go` (alta con afiliación, `UpdateUser`, `GetUserByID`), `network.go` (árbol `WITH RECURSIVE` + upline; comisiones sin revertidas), `orders.go` (transacción ACID + fallas simuladas), `order_queries.go` (listado paginado, detalle, cambio de estado y cancelación ACID), `commission_queries.go` (ledger del beneficiario con totales), `commissions.go` (inserción recursiva idempotente bajo `FOR SHARE` del pedido; ignora cancelados), `catalogs.go`, `errors.go` (SQLSTATE → `ErrNotFound`, `ErrDuplicate`, `ErrInvalidRef`, `ErrConstraint`, `ErrInsufficientStock`, `ErrInvalidQuantity`, `ErrProductInactive`, `ErrInvalidReferral`, `ErrInvalidTransition`, `ErrCommissionsPaid`; `DomainError.Public` marca el detalle apto para el usuario). |
 | `services/commissions.go` | `CommissionService`: `ProcessAsync` (goroutine con contexto propio, recover), `RecoverPending`, `Shutdown` (WaitGroup). |
 | `services/network_cache.go` | `NetworkCacheInvalidator`: borra `red:tree:*` del usuario y su upline (3 niveles). |
 | `cache/cache.go`, `cache/redis.go` | Interfaz `Cache` + `GetOrLoad` genérico (HIT/MISS/BYPASS en `X-Cache`) + `Delete`; `RedisCache` la implementa. |
-| `*_test.go` | `cache`, `config`, `controllers` (checkout, health, helpers, middleware, order, product, user, validation), `models` (orders), `services/commissions` — con dobles de prueba, sin BD ni Redis. |
+| `*_test.go` | `cache`, `config`, `controllers` (checkout, commission, health, helpers, middleware, order, product, user, validation), `models` (orders), `services/commissions` — con dobles de prueba, sin BD ni Redis. |
 | `Dockerfile`, `docker-compose.yml` | Imagen multi-etapa (binario estático en alpine) con `HEALTHCHECK`; compose con Postgres 16 + Redis + API, volumen `pgdata`, healthchecks en los tres servicios. |
 | `.env` (gitignored) / `.env.example` | Variables de `config.go`; `POSTGRES_PORT`, `REDIS_PORT`, `API_PORT` para compose. |
 
@@ -140,6 +146,7 @@ Capas: `routes` → `controllers` (structs con interfaces de `ports.go`) → `se
 | `POST /api/users` | Público | Usuario creado (rol `customer`, afiliado y con su `referral_code`) |
 | `GET /api/health`, `/api/health/db`, `/api/health/redis` | Público | `{status, database, redis}` (`ok` / `degraded` / `error`) / estado de cada dependencia |
 | `GET /api/me` | JWT | Cuenta autenticada vigente (`401` si fue desactivada) |
+| `GET /api/commissions/mine` | JWT | Ledger paginado del usuario + `totals` (pending, paid, reversed) |
 | `GET /api/network` | JWT | Árbol con `commission` por nodo; `referral_code` y `summary` en la raíz |
 | `GET /api/payment-methods` | JWT | Lista de métodos de pago |
 | `POST /api/checkout` (alias `POST /api/orders`) | JWT | `201 {id, created_at, status, total, items}` |
@@ -163,4 +170,4 @@ Capas: `routes` → `controllers` (structs con interfaces de `ports.go`) → `se
 - Caché: `productos:all` (5 min) y `red:tree:{email}` (10 min); sin Redis la API responde desde PostgreSQL (`X-Cache: BYPASS`). Checkout, alta/edición/baja de productos y alta/edición de usuarios invalidan las claves afectadas.
 - Demostración del ROLLBACK: `CHECKOUT_FAIL_AT=after_order|after_items` o `CHECKOUT_COMMIT_DELAY=10s` + `docker kill multicatalogo-db`. Desactivadas por defecto; nunca fuera de clase.
 - Seguridad vigente: bcrypt, contraseña fuerte en el registro, JWT HS256 (2h por defecto) verificado contra la cuenta en cada petición (desactivación y cambio de rol inmediatos), rutas protegidas por rol, errores sanitizados fuera de desarrollo, identidad del comprador desde el token, cuentas inactivas rechazadas en login y checkout.
-- Brechas abiertas (ver checklist y plan): verificación visual a 375px y recorrido en navegador de las vistas de las fases 2 a 4, y back-office (fases 5–8 del plan).
+- Brechas abiertas (ver checklist y plan): verificación visual a 375px y recorrido en navegador de las vistas de las fases 2, 3 y 5, y back-office (fases 6–8 del plan).

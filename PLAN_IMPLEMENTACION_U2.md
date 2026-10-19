@@ -174,9 +174,9 @@ token en `orders.user_id` y las líneas en `order_items`.
 
 **Frontend**
 
-- [ ] `/my-orders` (cliente): número, fecha, total, estado + detalle expandible (antes: `/mis-pedidos`) — implementada (`MyOrders.tsx`, `OrderCard.tsx`, `Pagination.tsx`); falta verificación en navegador
-- [ ] `/admin/orders` (admin): tabla con filtro por estado + cambio de estado (antes: `/admin/pedidos`) — implementada (`AdminOrders.tsx`, acciones solo con transiciones válidas y confirmación al cancelar); falta verificación en navegador
-- [ ] Enlace a `/my-orders` desde el navbar y desde la confirmación — implementado en el sidebar ("Mis Pedidos" y "Pedidos" para admin) y en la confirmación; falta verificación en navegador
+- [x] `/my-orders` (cliente): número, fecha, total, estado + detalle expandible (antes: `/mis-pedidos`) — implementada (`MyOrders.tsx`, `OrderCard.tsx`, `Pagination.tsx`); verificado en navegador
+- [x] `/admin/orders` (admin): tabla con filtro por estado + cambio de estado (antes: `/admin/pedidos`) — implementada (`AdminOrders.tsx`, acciones solo con transiciones válidas y confirmación al cancelar); verificado en navegador
+- [x] Enlace a `/my-orders` desde el navbar y desde la confirmación — implementado en el sidebar ("Mis Pedidos" y "Pedidos" para admin) y en la confirmación; verificado en navegador
 
 **Verificación**
 
@@ -203,18 +203,19 @@ con `UNIQUE(order_id, level)`; `CommissionService` en goroutine + `RecoverPendin
 
 **Backend**
 
-- [ ] `GET /api/commissions/mine`: ledger del usuario (pedido, nivel, monto, estado) + totales por estado (antes: `/api/comisiones/mias`)
+- [x] `GET /api/commissions/mine`: ledger del usuario (pedido, comprador, nivel, tasa, monto, estado), paginado, + totales por estado calculados sobre todo el ledger (antes: `/api/comisiones/mias`)
 
 **Frontend**
 
-- [ ] Abrir `my-network` a clientes (hoy está bajo `AdminRoute`; el backend ya filtra por token)
-- [ ] Link de invitación `/register?ref=CODIGO` con botón copiar
-- [ ] Panel "Mis comisiones": tabla del ledger + totales por estado
+- [ ] Abrir `my-network` a clientes (hoy está bajo `AdminRoute`; el backend ya filtra por token) — implementado (ruta para todos los roles, "Mi Red" en el sidebar, mensaje si la cuenta no está afiliada); falta verificación en navegador
+- [ ] Link de invitación `/register?ref=CODIGO` con botón copiar — implementado (`InviteLink.tsx`, solo en la red propia); falta verificación en navegador
+- [ ] Panel "Mis comisiones": tabla del ledger + totales por estado — implementado (`CommissionsPanel.tsx`, paginado); falta verificación en navegador
 
 **Verificación**
 
-- [ ] Dos clientes distintos ven árboles distintos en `/my-network`
-- [ ] `/api/commissions/mine` suma lo mismo que `v_user_commissions` del usuario
+- [x] Dos clientes distintos ven árboles distintos en `/my-network` (cada uno como raíz "Tú", con su propio código)
+- [x] `/api/commissions/mine` suma lo mismo que `v_user_commissions` del usuario (pending + paid; verificado en 3 cuentas)
+- [x] Una compra nueva aparece en el ledger del patrocinador; al cancelarla pasa a `reversed`
 
 ---
 
@@ -283,8 +284,8 @@ errores por campo.
 | 1 | Migración `0004_backoffice.sql` | ✅ Implementada y verificada |
 | 2 | Registro con código de referido + admin de usuarios + vistas | 🟡 Backend verificado; vistas implementadas, falta recorrido en navegador |
 | 3 | CRUD productos (edición + baja lógica) | 🟡 Backend verificado; vistas implementadas, falta recorrido en navegador |
-| 4 | Pedidos: consulta, estados, cancelación ACID | 🟡 Backend verificado; vistas implementadas, falta recorrido en navegador |
-| 5 | Comisiones del distribuidor + red visible al cliente | ⏳ Pendiente (base: ledger y `GET /api/network`) |
+| 4 | Pedidos: consulta, estados, cancelación ACID | ✅ Implementada y verificada |
+| 5 | Comisiones del distribuidor + red visible al cliente | 🟡 Backend verificado; vistas implementadas, falta recorrido en navegador |
 | 6 | Liquidaciones | ⏳ Pendiente (base: `v_user_commissions`) |
 | 7 | Reportes + Dashboard real | ⏳ Pendiente (base: vistas SQL) |
 | 8 | Paginación + `?q=` + auditoría | ⏳ Pendiente |
