@@ -10,14 +10,15 @@ import (
 
 // Controllers agrupa los controladores ya construidos en main con sus dependencias inyectadas.
 type Controllers struct {
-	Auth     *controllers.AuthMiddleware
-	Login    *controllers.AuthController
-	Products *controllers.ProductController
-	Network  *controllers.NetworkController
-	Checkout *controllers.CheckoutController
-	Orders   *controllers.OrderController
-	Users    *controllers.UserController
-	Health   *controllers.HealthController
+	Auth        *controllers.AuthMiddleware
+	Login       *controllers.AuthController
+	Products    *controllers.ProductController
+	Network     *controllers.NetworkController
+	Checkout    *controllers.CheckoutController
+	Orders      *controllers.OrderController
+	Commissions *controllers.CommissionController
+	Users       *controllers.UserController
+	Health      *controllers.HealthController
 }
 
 // SetupRoutes recibe la aplicación Fiber y los controladores para registrar las rutas.
@@ -50,6 +51,9 @@ func SetupRoutes(app *fiber.App, c Controllers) {
 
 	// Red de referidos: el cliente ve la suya; el admin puede consultar cualquiera.
 	app.Get("/api/network", auth, c.Network.GetNetwork)
+
+	// Ledger de comisiones del distribuidor autenticado.
+	app.Get("/api/commissions/mine", auth, c.Commissions.MyCommissions)
 
 	// Compra: el comprador se toma del token. /api/orders se conserva como alias de
 	// /api/checkout para no romper clientes de la Fase 2.

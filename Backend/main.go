@@ -86,14 +86,15 @@ func main() {
 	commissions.RecoverPending()
 
 	ctrls := routes.Controllers{
-		Auth:     controllers.NewAuthMiddleware(jwtManager, repo),
-		Login:    controllers.NewAuthController(repo, jwtManager),
-		Products: controllers.NewProductController(repo, redisCache),
-		Network:  controllers.NewNetworkController(repo, redisCache, cfg.NetworkRootEmail),
-		Checkout: controllers.NewCheckoutController(repo, redisCache, networkCache, commissions, cfg.CheckoutCommitDelay),
-		Orders:   controllers.NewOrderController(repo, redisCache, networkCache),
-		Users:    controllers.NewUserController(repo, networkCache),
-		Health:   controllers.NewHealthController(repo, redisCache),
+		Auth:        controllers.NewAuthMiddleware(jwtManager, repo),
+		Login:       controllers.NewAuthController(repo, jwtManager),
+		Products:    controllers.NewProductController(repo, redisCache),
+		Network:     controllers.NewNetworkController(repo, redisCache, cfg.NetworkRootEmail),
+		Checkout:    controllers.NewCheckoutController(repo, redisCache, networkCache, commissions, cfg.CheckoutCommitDelay),
+		Orders:      controllers.NewOrderController(repo, redisCache, networkCache),
+		Commissions: controllers.NewCommissionController(repo),
+		Users:       controllers.NewUserController(repo, networkCache),
+		Health:      controllers.NewHealthController(repo, redisCache),
 	}
 
 	// Instanciamos una nueva aplicación de Fiber y la guardamos en la variable 'app'.

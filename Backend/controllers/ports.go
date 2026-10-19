@@ -44,6 +44,11 @@ type OrderQueryRepository interface {
 	UpdateOrderStatus(ctx context.Context, id int, status string) (*models.OrderDetail, error)
 }
 
+// CommissionQueryRepository es la consulta del ledger de comisiones de un distribuidor.
+type CommissionQueryRepository interface {
+	ListUserCommissions(ctx context.Context, userID, page, limit int) (*models.CommissionLedger, error)
+}
+
 // UserRepository es el acceso a datos de cuentas.
 type UserRepository interface {
 	GetUsers(ctx context.Context) ([]models.User, error)
