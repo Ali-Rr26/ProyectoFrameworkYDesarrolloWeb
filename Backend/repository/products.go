@@ -26,9 +26,16 @@ const selectProduct = `
 	           (SELECT json_agg(pi.url ORDER BY pi.position)
 	            FROM product_images pi
 	            WHERE pi.product_id = p.id),
-	           '[]'::json)
+	           '[]'::json)` + productFrom
+
+// productFrom une el producto con su categoría.
+const productFrom = `
 	FROM products p
 	JOIN categories c ON c.id = p.category_id`
+
+// productSearch filtra el listado del admin; $1 = patrón de containsPattern (vacío = todos).
+const productSearch = `
+	WHERE ($1 = '' OR p.name ILIKE $1 OR c.name ILIKE $1)`
 
 // scanner abstrae *sql.Row y *sql.Rows para reutilizar scanProduct.
 type scanner interface {
@@ -53,14 +60,27 @@ func (r *Repository) GetProducts(ctx context.Context) ([]models.Product, error) 
 	return r.listProducts(ctx, selectProduct+` WHERE p.active ORDER BY p.id`)
 }
 
-// GetAllProducts devuelve todos los productos, incluidos los dados de baja (vista admin).
-func (r *Repository) GetAllProducts(ctx context.Context) ([]models.Product, error) {
-	return r.listProducts(ctx, selectProduct+` ORDER BY p.id`)
+// ListAllProducts devuelve una página de productos, incluidos los dados de baja (vista
+// admin), filtrados por nombre o categoría, y el total que cumple el filtro.
+func (r *Repository) ListAllProducts(ctx context.Context, f models.ListFilter) (*models.Page[models.Product], error) {
+	page := &models.Page[models.Product]{Page: f.Page, Limit: f.Limit}
+	pattern := containsPattern(f.Query)
+	if err := r.db.QueryRowContext(ctx, `SELECT count(*)`+productFrom+productSearch, pattern).Scan(&page.Total); err != nil {
+		return nil, mapError(err)
+	}
+
+	products, err := r.listProducts(ctx, selectProduct+productSearch+` ORDER BY p.id LIMIT $2 OFFSET $3`,
+		pattern, f.Limit, (f.Page-1)*f.Limit)
+	if err != nil {
+		return nil, err
+	}
+	page.Data = products
+	return page, nil
 }
 
 // listProducts ejecuta una consulta basada en selectProduct y lee todas sus filas.
-func (r *Repository) listProducts(ctx context.Context, query string) ([]models.Product, error) {
-	rows, err := r.db.QueryContext(ctx, query)
+func (r *Repository) listProducts(ctx context.Context, query string, args ...any) ([]models.Product, error) {
+	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, mapError(err)
 	}

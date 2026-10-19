@@ -50,6 +50,14 @@ type Page[T any] struct {
 	Total int `json:"total"`
 }
 
+// ListFilter acota los listados del administrador con búsqueda (usuarios y productos):
+// Query es el texto de ?q= (cadena vacía = sin filtro).
+type ListFilter struct {
+	Query string
+	Page  int
+	Limit int
+}
+
 // OrderSummary es una fila de los listados de pedidos.
 type OrderSummary struct {
 	ID         int       `json:"id"`

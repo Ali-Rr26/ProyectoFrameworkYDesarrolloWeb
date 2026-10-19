@@ -52,13 +52,19 @@ func (h *ProductController) GetCategories(c *fiber.Ctx) error {
 	return c.JSON(categories)
 }
 
-// GetAdminProducts lista todos los productos, incluidos los dados de baja (solo admin).
-// No usa la caché: el administrador siempre ve el estado actual.
+// GetAdminProducts lista los productos, incluidos los dados de baja (solo admin), paginados
+// y con búsqueda ?q= por nombre o categoría. No usa la caché: el administrador siempre ve
+// el estado actual; el catálogo público sigue completo y cacheado.
 func (h *ProductController) GetAdminProducts(c *fiber.Ctx) error {
+	filter, err := listFilter(c)
+	if err != nil {
+		return apiError(c, fiber.StatusBadRequest, "Parámetros de listado inválidos", err.Error())
+	}
+
 	ctx, cancel := dbCtx(c)
 	defer cancel()
 
-	products, err := h.repo.GetAllProducts(ctx)
+	products, err := h.repo.ListAllProducts(ctx, filter)
 	if err != nil {
 		return repoError(c, err)
 	}

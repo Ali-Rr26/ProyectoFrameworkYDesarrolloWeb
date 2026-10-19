@@ -27,12 +27,18 @@ func NewUserController(repo UserRepository, network NetworkInvalidator) *UserCon
 	return &UserController{repo: repo, network: network}
 }
 
-// GetUsers lista las cuentas registradas (solo administrador; nunca expone el hash).
+// GetUsers lista las cuentas registradas (solo administrador; nunca expone el hash),
+// paginadas y con búsqueda ?q= por nombre, correo o código de referido.
 func (h *UserController) GetUsers(c *fiber.Ctx) error {
+	filter, err := listFilter(c)
+	if err != nil {
+		return apiError(c, fiber.StatusBadRequest, "Parámetros de listado inválidos", err.Error())
+	}
+
 	ctx, cancel := dbCtx(c)
 	defer cancel()
 
-	users, err := h.repo.GetUsers(ctx)
+	users, err := h.repo.ListUsers(ctx, filter)
 	if err != nil {
 		return repoError(c, err)
 	}

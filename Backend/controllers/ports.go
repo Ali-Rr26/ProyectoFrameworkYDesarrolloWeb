@@ -16,7 +16,7 @@ import (
 // ProductRepository es el acceso a datos del catálogo.
 type ProductRepository interface {
 	GetProducts(ctx context.Context) ([]models.Product, error)
-	GetAllProducts(ctx context.Context) ([]models.Product, error)
+	ListAllProducts(ctx context.Context, f models.ListFilter) (*models.Page[models.Product], error)
 	GetProductByID(ctx context.Context, id int) (*models.Product, error)
 	GetCategories(ctx context.Context) ([]string, error)
 	CreateProduct(ctx context.Context, in models.ProductInput) (*models.Product, error)
@@ -65,7 +65,7 @@ type ReportRepository interface {
 
 // UserRepository es el acceso a datos de cuentas.
 type UserRepository interface {
-	GetUsers(ctx context.Context) ([]models.User, error)
+	ListUsers(ctx context.Context, f models.ListFilter) (*models.Page[models.User], error)
 	CreateUser(ctx context.Context, in models.RegisterRequest) (*models.User, error)
 	UpdateUser(ctx context.Context, id int, in models.UpdateUserRequest) (*models.User, error)
 }

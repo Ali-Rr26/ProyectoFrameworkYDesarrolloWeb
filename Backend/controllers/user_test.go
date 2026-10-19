@@ -24,9 +24,13 @@ type fakeUsers struct {
 	createUser *models.User
 	createErr  error
 	updateErr  error
+	listed     *models.ListFilter
 }
 
-func (f *fakeUsers) GetUsers(context.Context) ([]models.User, error) { return nil, nil }
+func (f *fakeUsers) ListUsers(_ context.Context, filter models.ListFilter) (*models.Page[models.User], error) {
+	f.listed = &filter
+	return &models.Page[models.User]{Data: []models.User{}, Page: filter.Page, Limit: filter.Limit}, nil
+}
 
 func (f *fakeUsers) CreateUser(_ context.Context, in models.RegisterRequest) (*models.User, error) {
 	f.created = &in
@@ -50,6 +54,7 @@ func newUserApp(repo *fakeUsers, network *fakeInvalidator) *fiber.App {
 		c.Locals(localsClaims, &auth.Claims{Role: "admin", RegisteredClaims: jwt.RegisteredClaims{Subject: "1"}})
 		return c.Next()
 	}
+	app.Get("/api/users", asAdmin, ctrl.GetUsers)
 	app.Patch("/api/users/:id", asAdmin, ctrl.UpdateUser)
 	return app
 }

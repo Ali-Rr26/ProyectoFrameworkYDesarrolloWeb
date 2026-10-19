@@ -19,10 +19,14 @@ type fakeProducts struct {
 	updated     *models.ProductUpdate
 	deactivated int
 	err         error
+	listed      *models.ListFilter
 }
 
-func (f *fakeProducts) GetProducts(context.Context) ([]models.Product, error)    { return nil, nil }
-func (f *fakeProducts) GetAllProducts(context.Context) ([]models.Product, error) { return nil, nil }
+func (f *fakeProducts) GetProducts(context.Context) ([]models.Product, error) { return nil, nil }
+func (f *fakeProducts) ListAllProducts(_ context.Context, filter models.ListFilter) (*models.Page[models.Product], error) {
+	f.listed = &filter
+	return &models.Page[models.Product]{Data: []models.Product{}, Page: filter.Page, Limit: filter.Limit}, nil
+}
 func (f *fakeProducts) GetProductByID(context.Context, int) (*models.Product, error) {
 	return nil, repository.ErrNotFound
 }
@@ -52,6 +56,7 @@ func (f *fakeProducts) DeactivateProduct(_ context.Context, id int) (*models.Pro
 func newProductApp(repo *fakeProducts, c *fakeCache) *fiber.App {
 	ctrl := NewProductController(repo, c)
 	app := fiber.New()
+	app.Get("/api/admin/products", ctrl.GetAdminProducts)
 	app.Post("/api/products", ctrl.CreateProduct)
 	app.Put("/api/products/:id", ctrl.UpdateProduct)
 	app.Delete("/api/products/:id", ctrl.DeleteProduct)

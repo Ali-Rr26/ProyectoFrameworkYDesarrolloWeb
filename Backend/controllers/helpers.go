@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"log"
 	"strconv"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/gofiber/fiber/v2"
 
@@ -66,6 +68,23 @@ func pagination(c *fiber.Ctx) (page, limit int, err error) {
 		}
 	}
 	return page, limit, nil
+}
+
+// maxSearchLength es el largo máximo del texto de búsqueda (?q=).
+const maxSearchLength = 100
+
+// listFilter lee la paginación estándar y ?q= (texto a buscar, sin espacios a los lados)
+// de los listados del administrador con búsqueda.
+func listFilter(c *fiber.Ctx) (models.ListFilter, error) {
+	page, limit, err := pagination(c)
+	if err != nil {
+		return models.ListFilter{}, err
+	}
+	query := strings.TrimSpace(c.Query("q"))
+	if utf8.RuneCountInString(query) > maxSearchLength {
+		return models.ListFilter{}, fmt.Errorf("q admite como máximo %d caracteres", maxSearchLength)
+	}
+	return models.ListFilter{Query: query, Page: page, Limit: limit}, nil
 }
 
 // apiError responde con la estructura estándar APIError.

@@ -11,12 +11,19 @@ import (
 	"multicatalogo-backend/models"
 )
 
-// selectUser une la cuenta con su rol y, si está afiliado, con su patrocinador y su código.
-const selectUser = `
-	SELECT u.id, u.email, u.password_hash, u.name, r.name, u.active, nm.sponsor_id, nm.referral_code
+// userFrom une la cuenta con su rol y, si está afiliado, con su patrocinador y su código.
+const userFrom = `
 	FROM users u
 	JOIN roles r ON r.id = u.role_id
 	LEFT JOIN network_members nm ON nm.user_id = u.id`
+
+// selectUser lee una cuenta completa (ver scanUser).
+const selectUser = `
+	SELECT u.id, u.email, u.password_hash, u.name, r.name, u.active, nm.sponsor_id, nm.referral_code` + userFrom
+
+// userSearch filtra el listado del admin; $1 = patrón de containsPattern (vacío = todos).
+const userSearch = `
+	WHERE ($1 = '' OR u.name ILIKE $1 OR u.email ILIKE $1 OR nm.referral_code ILIKE $1)`
 
 // scanUser lee una fila de selectUser en un models.User.
 func scanUser(s scanner) (models.User, error) {
@@ -25,23 +32,30 @@ func scanUser(s scanner) (models.User, error) {
 	return u, err
 }
 
-// GetUsers lista todas las cuentas (el hash nunca se serializa gracias a json:"-").
-func (r *Repository) GetUsers(ctx context.Context) ([]models.User, error) {
-	rows, err := r.db.QueryContext(ctx, selectUser+` ORDER BY u.id`)
+// ListUsers devuelve una página de cuentas ordenadas por ID, filtradas por nombre, correo
+// o código de referido, y el total que cumple el filtro (el hash nunca se serializa
+// gracias a json:"-").
+func (r *Repository) ListUsers(ctx context.Context, f models.ListFilter) (*models.Page[models.User], error) {
+	page := &models.Page[models.User]{Data: []models.User{}, Page: f.Page, Limit: f.Limit}
+	pattern := containsPattern(f.Query)
+	if err := r.db.QueryRowContext(ctx, `SELECT count(*)`+userFrom+userSearch, pattern).Scan(&page.Total); err != nil {
+		return nil, mapError(err)
+	}
+
+	rows, err := r.db.QueryContext(ctx, selectUser+userSearch+` ORDER BY u.id LIMIT $2 OFFSET $3`,
+		pattern, f.Limit, (f.Page-1)*f.Limit)
 	if err != nil {
 		return nil, mapError(err)
 	}
 	defer rows.Close()
-
-	users := []models.User{}
 	for rows.Next() {
 		u, err := scanUser(rows)
 		if err != nil {
 			return nil, err
 		}
-		users = append(users, u)
+		page.Data = append(page.Data, u)
 	}
-	return users, rows.Err()
+	return page, rows.Err()
 }
 
 // GetUserByEmail busca una cuenta por correo (sin distinguir mayúsculas).
