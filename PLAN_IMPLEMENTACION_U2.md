@@ -271,13 +271,14 @@ las agregaciones.
 
 **Ya existe:** todas las rutas de escritura actuales con `RequireAuth`; las admin con
 `RequireRole("admin")` (antes: `RequireAdmin`); validación de entrada por controlador con
-errores por campo.
+errores por campo; `Page[T]` y `pagination` ya usados en pedidos (Fase 4), comisiones
+(Fase 5) y liquidaciones (Fase 6), con su componente `Pagination.tsx`.
 
-- [ ] Paginación estándar `Page[T]{data, page, limit, total}` en usuarios, pedidos y productos admin (antes: `Pagina`)
-- [ ] `?q=` server-side (`ILIKE`) en `/api/admin/products`; el catálogo público sigue completo y cacheado
-- [ ] Paginación en las vistas de listado del front
-- [ ] Auditoría final: toda ruta nueva de las fases 2–7 con `RequireAuth` y, si es admin, `RequireRole("admin")`
-- [ ] (Opcional) Validación central de entrada reutilizable entre controladores
+- [x] Paginación estándar `Page[T]{data, page, limit, total}` en usuarios, pedidos y productos admin (antes: `Pagina`) — pedidos desde la Fase 4; `GET /api/users` (`ListUsers`) y `GET /api/admin/products` (`ListAllProducts`) pasan de lista a `Page`, ordenados por ID
+- [x] `?q=` server-side (`ILIKE`) en `/api/admin/products` (nombre o categoría) y también en `/api/users` (nombre, correo o código de referido); texto sin espacios a los lados, máximo 100 caracteres, comodines `%`/`_` buscados literal (`containsPattern`); el catálogo público sigue completo y cacheado
+- [x] Paginación en las vistas de listado del front — `AdminUsers` y `AdminProducts` con `Pagination` y búsqueda (`SearchInput` + `useDebouncedValue`, 300 ms; al cambiar la búsqueda vuelve a la página 1); `listQuery` compartido en `apiClient.ts`. Falta verificación en navegador
+- [x] Auditoría final: toda ruta nueva de las fases 2–7 con `RequireAuth` y, si es admin, `RequireRole("admin")` — revisado `routes.go` y probado contra la API: 23 rutas protegidas → 401 sin token, 14 de admin → 403 para un cliente; públicas solo login, registro, catálogo, categorías y health
+- [x] (Opcional) Validación central de entrada reutilizable entre controladores — `validation.go` (correo, contraseña, productos) y `helpers.go` (`pagination`, `listFilter`) compartidos por los controladores
 
 > Fuera de alcance: emails transaccionales (se podría simular con un `Mailer` inyectado
 > que registre en log), pasarela de pago real, refresh tokens, Outbox persistente.
@@ -296,7 +297,7 @@ errores por campo.
 | 5 | Comisiones del distribuidor + red visible al cliente | 🟡 Backend verificado; vistas implementadas, falta recorrido en navegador |
 | 6 | Liquidaciones | 🟡 Backend verificado; vista implementada, falta recorrido en navegador |
 | 7 | Reportes + Dashboard real | 🟡 Backend verificado; Dashboard implementado, falta recorrido en navegador |
-| 8 | Paginación + `?q=` + auditoría | ⏳ Pendiente |
+| 8 | Paginación + `?q=` + auditoría | 🟡 Backend verificado; vistas implementadas, falta recorrido en navegador |
 
 > Con 0–5 el sistema **vende, afilia por código, gestiona pedidos y traza comisiones**:
 > MLM mínimo funcional. 6–8 lo llevan a operación diaria real.

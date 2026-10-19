@@ -56,13 +56,13 @@ Nombre del paquete: `multicatalogo-frontend`. URL de la API en `VITE_API_URL` (`
 | `context/auth.ts` | `AuthContext`, hook `useAuth` y tipos `Role`/`User` (separados del Provider para Fast Refresh). |
 | `context/CartContext.tsx` | `CartProvider`: carrito por usuario en localStorage (`multicatalogo_cart_<email>`), tope por stock. |
 | `context/cart.ts` | `CartContext`, hook `useCart` y tipo `CartItem`. |
-| `services/apiClient.ts` | Cliente HTTP único (GET/POST/PUT/PATCH/DELETE): `apiFetch` con `Authorization: Bearer` automático, `ApiError{status, message, details}`, `setAuthToken`, `setUnauthorizedHandler`. |
-| `services/productService.ts` | `getProducts()`, `getProductById()` → `GET /api/products[/:id]`; `getCategories()` → `GET /api/categories`; admin: `getAdminProducts()`, `createProduct()`, `updateProduct()` (PUT), `deactivateProduct()` (DELETE). |
+| `services/apiClient.ts` | Cliente HTTP único (GET/POST/PUT/PATCH/DELETE): `apiFetch` con `Authorization: Bearer` automático, `ApiError{status, message, details}`, `setAuthToken`, `setUnauthorizedHandler`, `listQuery` (`?page&limit` + filtros no vacíos). |
+| `services/productService.ts` | `getProducts()`, `getProductById()` → `GET /api/products[/:id]`; `getCategories()` → `GET /api/categories`; admin: `getAdminProducts(page, limit, q)` (`Page`), `createProduct()`, `updateProduct()` (PUT), `deactivateProduct()` (DELETE). |
 | `services/networkService.ts` | `getNetwork()` → `GET /api/network` (JWT). |
 | `services/reportService.ts` | `getSummary()`, `getTopProducts()`, `getTopSponsors()` → `/api/reports/*` (admin), con `?range=` o `?from&to`. |
 | `services/payoutService.ts` | `getMyPayouts()`; admin: `getPendingDebts()`, `getPayouts()`, `createPayout()`. |
 | `services/commissionService.ts` | `getMyCommissions()` → `GET /api/commissions/mine` (paginado, con totales). |
-| `services/userService.ts` | `registerUser()` → `POST /api/users` (público); `getMe()` → `GET /api/me`; `getUsers()` → `GET /api/users`; `updateUser()` → `PATCH /api/users/:id` (admin). |
+| `services/userService.ts` | `registerUser()` → `POST /api/users` (público); `getMe()` → `GET /api/me`; `getUsers(page, limit, q)` → `GET /api/users` (`Page`); `updateUser()` → `PATCH /api/users/:id` (admin). |
 | `services/orderService.ts` | `createOrder()` → `POST /api/checkout`; `getPaymentMethods()`; `getMyOrders()`, `getOrder()`; admin: `getOrders()`, `updateOrderStatus()`. |
 | `data/products.ts` | Tipos `Product` (incluye `stock`, `gallery`, `active`), `ProductInput`, `ProductUpdate`. |
 | `data/reports.ts` | Tipos `SalesSummary`, `TopProduct`, `TopSponsor`; periodos del selector (`RangePreset`, `RANGE_LABELS`) y funciones puras `presetDays`, `money`. |
@@ -93,9 +93,10 @@ Nombre del paquete: `multicatalogo-frontend`. URL de la API en `VITE_API_URL` (`
 | `components/InviteLink.tsx` | Código de referido y link `/register?ref=CODIGO` con botón copiar. |
 | `components/CommissionsPanel.tsx` | "Mis comisiones": totales por estado y ledger paginado. |
 | `components/PayoutsPanel.tsx` | "Mis cobros": liquidaciones recibidas (fecha, monto, comisiones), paginado. |
-| `components/AdminProducts.tsx` | `/admin/products` (**solo admin**) — todos los productos (activos e inactivos); crear, editar, dar de baja y reactivar con confirmación. |
+| `components/AdminProducts.tsx` | `/admin/products` (**solo admin**) — productos paginados (activos e inactivos) con búsqueda por nombre o categoría; crear, editar, dar de baja y reactivar con confirmación. |
 | `components/ProductForm.tsx` | Formulario de alta/edición de productos (un campo por fila; categorías desde la API; galería como una URL por línea). |
-| `components/AdminUsers.tsx` | `/admin/users` (**solo admin**) — cuentas con rol, estado, código y patrocinador; cambio de rol y activar/desactivar (no sobre la propia cuenta). |
+| `components/SearchInput.tsx`, `hooks/useDebouncedValue.ts` | Campo de búsqueda de los listados admin y hook que espera 300 ms sin cambios antes de consultar `?q=`. |
+| `components/AdminUsers.tsx` | `/admin/users` (**solo admin**) — cuentas paginadas con búsqueda por nombre, correo o código; rol, estado, código y patrocinador; cambio de rol y activar/desactivar (no sobre la propia cuenta). |
 | `components/Layout.tsx` (alto `h-dvh`; `<main>` relativo y con scroll propio), `Navbar.tsx`, `Sidebar.tsx`, `CustomSelect.tsx` | Shell: sidebar colapsable (Dashboard, Tienda, Catálogo, Mis Pedidos, Mi Red, Pedidos, Liquidaciones, Productos, Usuarios; las de admin se filtran por rol), navbar con carrito/avatar/logout, select personalizado. |
 
 ---
@@ -123,28 +124,28 @@ Capas: `routes` → `controllers` (structs con interfaces de `ports.go`) → `se
 | `models/reports.go` | `DateRange`, `ResolvedRange`, periodos `Range*`, `SalesSummary`, `TopProduct`, `TopSponsor`. |
 | `models/payouts.go` | `Payout`, `PendingDebt`, `CreatePayoutRequest`. |
 | `models/commissions.go` | `CommissionEntry`, `CommissionTotals`, `CommissionLedger` (página + totales). |
-| `models/orders.go` | Estados del pedido y reglas puras de transición (`OrderTransitionAllowed`, `NextOrderStatuses`), `Page[T]`, `OrderSummary`, `OrderDetail`, `OrderFilter`. |
+| `models/orders.go` | Estados del pedido y reglas puras de transición (`OrderTransitionAllowed`, `NextOrderStatuses`), `Page[T]`, `ListFilter` (`?q` + página), `OrderSummary`, `OrderDetail`, `OrderFilter`. |
 | `models/models.go` | `LoginRequest`, `Product`, `ProductInput`, `ProductUpdate`, `User` (hash con `json:"-"`), `RegisterRequest` (`sponsor_id` o `referral_code`), `UpdateUserRequest`, `NetworkNode` (con `referral_code`)/`NetworkSummary`, `CreateOrderRequest`/`OrderItemInput`, `Order`/`OrderItem`, `PendingCommission`, `APIError`. |
 | `routes/routes.go` | `SetupRoutes(app, Controllers)`; middleware por ruta (públicas nunca pasan por auth). |
 | `controllers/ports.go` | Interfaces por consumidor: `ProductRepository`, `NetworkRepository`, `OrderRepository`, `UserRepository`, `CredentialRepository`, `Pinger`, `OrderQueryRepository`, `CommissionQueryRepository`, `PayoutRepository`, `ReportRepository`, `AccountLookup`, `TokenIssuer`, `TokenParser`, `NetworkInvalidator`, `CommissionProcessor`. |
 | `controllers/middleware.go` | `AuthMiddleware.RequireAuth` (Bearer → verifica en la base que la cuenta siga activa y toma su rol vigente → claims y cuenta en `Locals`) y `RequireRole(...)`. |
 | `controllers/validation.go` | Funciones puras `validEmail`, `passwordProblems` (contraseña fuerte), `validateProductInput` y `validateProductUpdate`. |
-| `controllers/helpers.go` | `apiError`, `pagination` (`?page`, `?limit` 1–50), `repoError` (errores de dominio → 400/404/409/422/503/500; detalle técnico solo con `APP_ENV=dev`), middleware `ErrorDetails`, `dbCtx` (timeout 5 s). |
+| `controllers/helpers.go` | `apiError`, `pagination` (`?page`, `?limit` 1–50), `listFilter` (paginación + `?q=` hasta 100 caracteres), `repoError` (errores de dominio → 400/404/409/422/503/500; detalle técnico solo con `APP_ENV=dev`), middleware `ErrorDetails`, `dbCtx` (timeout 5 s). |
 | `controllers/authController.go` | `POST /api/login` — bcrypt + hash ficticio (anti-enumeración), 401 genérico; `GET /api/me` — cuenta autenticada vigente. |
-| `controllers/productController.go` | Catálogo público con Cache-Aside `productos:all` (5 min, solo activos), `GET /api/categories`; admin: listado completo, `POST`, `PUT` (edición parcial/reactivación) y `DELETE` (baja lógica), invalidando la caché. |
+| `controllers/productController.go` | Catálogo público con Cache-Aside `productos:all` (5 min, solo activos), `GET /api/categories`; admin: listado paginado con `?q=` (sin caché), `POST`, `PUT` (edición parcial/reactivación) y `DELETE` (baja lógica), invalidando la caché. |
 | `controllers/networkController.go` | `GET /api/network` — red del token (admin: `?user_id=` o `NETWORK_ROOT_EMAIL`); Cache-Aside `red:tree:{email}` (10 min); "Tú" se personaliza tras la caché. |
 | `controllers/checkoutController.go` | `POST /api/checkout` (+ alias `/api/orders`) y `GET /api/payment-methods`; comprador del JWT; cantidad ≤0 → 400 propio; tras COMMIT invalida caché y lanza comisiones. |
 | `controllers/reportController.go` | `GET /api/reports/summary`, `/top-products`, `/top-sponsors` (admin); periodo con las funciones puras `resolveRange` y `parseDateRange` en la zona del negocio. |
 | `controllers/payoutController.go` | `POST /api/payouts`, `GET /api/payouts` y `GET /api/reports/pending-commissions` (admin); `GET /api/payouts/mine`. |
 | `controllers/commissionController.go` | `GET /api/commissions/mine` — ledger del usuario del token. |
 | `controllers/orderController.go` | `GET /api/orders/mine`, `GET /api/orders/:id` (dueño o admin), `GET /api/orders` y `PATCH /api/orders/:id/status` (admin; al cancelar invalida catálogo y red del comprador). |
-| `controllers/userController.go` | `POST /api/users` (registro público; patrocinador por `sponsor_id` o `referral_code`; siempre queda afiliado), `GET /api/users` y `PATCH /api/users/:id` (admin: rol y `active`, nunca sobre sí mismo). |
+| `controllers/userController.go` | `POST /api/users` (registro público; patrocinador por `sponsor_id` o `referral_code`; siempre queda afiliado), `GET /api/users` (paginado, `?q=`) y `PATCH /api/users/:id` (admin: rol y `active`, nunca sobre sí mismo). |
 | `controllers/healthController.go` | `GET /api/health` (ping a ambas dependencias: `ok`, `degraded` si cae Redis, 503 si cae PostgreSQL), `/api/health/db` y `/api/health/redis` (503 si cae). |
-| `repository/` | Única capa con SQL: `products.go` (catálogo activo, listado admin, edición con bloqueo de fila, baja lógica, categorías), `users.go` (alta con afiliación, `UpdateUser`, `GetUserByID`), `network.go` (árbol `WITH RECURSIVE` + upline; comisiones sin revertidas), `orders.go` (transacción ACID + fallas simuladas), `order_queries.go` (listado paginado, detalle, cambio de estado y cancelación ACID), `commission_queries.go` (ledger del beneficiario con totales), `reports.go` (KPIs y rankings sin pedidos cancelados), `payouts.go` (liquidación de comisiones de pedidos entregados en transacción con bloqueo pedidos → comisiones, historial y deuda por distribuidor), `commissions.go` (inserción recursiva idempotente bajo `FOR SHARE` del pedido; ignora cancelados), `catalogs.go`, `errors.go` (SQLSTATE → `ErrNotFound`, `ErrDuplicate`, `ErrInvalidRef`, `ErrConstraint`, `ErrInsufficientStock`, `ErrInvalidQuantity`, `ErrProductInactive`, `ErrInvalidReferral`, `ErrInvalidTransition`, `ErrCommissionsPaid`, `ErrNothingToPay`; `DomainError.Public` marca el detalle apto para el usuario). |
+| `repository/` | Única capa con SQL: `products.go` (catálogo activo, listado admin paginado con búsqueda, edición con bloqueo de fila, baja lógica, categorías), `users.go` (listado paginado con búsqueda, alta con afiliación, `UpdateUser`, `GetUserByID`), `search.go` (`containsPattern`: patrón ILIKE con `%`/`_` escapados), `network.go` (árbol `WITH RECURSIVE` + upline; comisiones sin revertidas), `orders.go` (transacción ACID + fallas simuladas), `order_queries.go` (listado paginado, detalle, cambio de estado y cancelación ACID), `commission_queries.go` (ledger del beneficiario con totales), `reports.go` (KPIs y rankings sin pedidos cancelados), `payouts.go` (liquidación de comisiones de pedidos entregados en transacción con bloqueo pedidos → comisiones, historial y deuda por distribuidor), `commissions.go` (inserción recursiva idempotente bajo `FOR SHARE` del pedido; ignora cancelados), `catalogs.go`, `errors.go` (SQLSTATE → `ErrNotFound`, `ErrDuplicate`, `ErrInvalidRef`, `ErrConstraint`, `ErrInsufficientStock`, `ErrInvalidQuantity`, `ErrProductInactive`, `ErrInvalidReferral`, `ErrInvalidTransition`, `ErrCommissionsPaid`, `ErrNothingToPay`; `DomainError.Public` marca el detalle apto para el usuario). |
 | `services/commissions.go` | `CommissionService`: `ProcessAsync` (goroutine con contexto propio, recover), `RecoverPending`, `Shutdown` (WaitGroup). |
 | `services/network_cache.go` | `NetworkCacheInvalidator`: borra `red:tree:*` del usuario y su upline (3 niveles). |
 | `cache/cache.go`, `cache/redis.go` | Interfaz `Cache` + `GetOrLoad` genérico (HIT/MISS/BYPASS en `X-Cache`) + `Delete`; `RedisCache` la implementa. |
-| `*_test.go` | `cache`, `config`, `controllers` (checkout, commission, health, helpers, middleware, order, payout, product, report, user, validation), `models` (orders), `services/commissions` — con dobles de prueba, sin BD ni Redis. |
+| `*_test.go` | `cache`, `config`, `controllers` (checkout, commission, health, helpers, list, middleware, order, payout, product, report, user, validation), `models` (orders), `repository` (search), `services/commissions` — con dobles de prueba, sin BD ni Redis. |
 | `Dockerfile`, `docker-compose.yml` | Imagen multi-etapa (binario estático en alpine) con `HEALTHCHECK`; compose con Postgres 16 + Redis + API, volumen `pgdata`, healthchecks en los tres servicios. |
 | `.env` (gitignored) / `.env.example` | Variables de `config.go`; `POSTGRES_PORT`, `REDIS_PORT`, `API_PORT` para compose. |
 
@@ -164,12 +165,12 @@ Capas: `routes` → `controllers` (structs con interfaces de `ports.go`) → `se
 | `GET /api/payment-methods` | JWT | Lista de métodos de pago |
 | `POST /api/checkout` (alias `POST /api/orders`) | JWT | `201 {id, created_at, status, total, items}` |
 | `GET /api/orders/mine`, `GET /api/orders/:id` | JWT | Pedidos propios paginados / detalle (dueño o admin; ajeno → 404) |
-| `GET /api/users`, `POST /api/products` | JWT + admin | Listado de usuarios (con `referral_code`) / producto creado |
+| `GET /api/users`, `POST /api/products` | JWT + admin | `Page` de usuarios (con `referral_code`; `?page&limit&q`) / producto creado |
 | `GET /api/orders`, `PATCH /api/orders/:id/status` | JWT + admin | Todos los pedidos (`?status=`) / cambio de estado (cancelar repone stock y revierte comisiones) |
 | `GET /api/reports/summary`, `/top-products`, `/top-sponsors` | JWT + admin | KPIs y rankings del periodo `?range=last_30_days\|month_to_date\|today` o `?from&to`, en la zona horaria del negocio (sin cancelados; máximo un año) |
 | `GET /api/reports/pending-commissions` | JWT + admin | Deuda por distribuidor: `ready_*` (pedidos entregados) y `waiting_*` (en espera) |
 | `POST /api/payouts`, `GET /api/payouts` | JWT + admin | Liquidar las comisiones de pedidos entregados de un distribuidor (`409` si no hay) / historial de pagos |
-| `GET /api/admin/products` | JWT + admin | Todos los productos, incluidos los dados de baja |
+| `GET /api/admin/products` | JWT + admin | `Page` de productos, incluidos los dados de baja (`?page&limit&q`) |
 | `PUT /api/products/:id`, `DELETE /api/products/:id` | JWT + admin | Producto editado o reactivado / dado de baja (`active: false`) |
 | `PATCH /api/users/:id` | JWT + admin | Usuario actualizado (`role` y/o `active`) |
 
