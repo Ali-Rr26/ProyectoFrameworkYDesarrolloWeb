@@ -30,6 +30,8 @@ var (
 	ErrInvalidTransition = errors.New("transición de estado inválida")
 	// ErrCommissionsPaid: el pedido tiene comisiones ya liquidadas y no se cancela (HTTP 409).
 	ErrCommissionsPaid = errors.New("comisiones ya liquidadas")
+	// ErrNothingToPay: el distribuidor no tiene comisiones de pedidos entregados por liquidar (HTTP 409).
+	ErrNothingToPay = errors.New("sin comisiones pendientes")
 )
 
 // Códigos SQLSTATE de PostgreSQL que traducimos.

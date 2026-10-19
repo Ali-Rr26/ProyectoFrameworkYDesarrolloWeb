@@ -17,6 +17,7 @@ type Controllers struct {
 	Checkout    *controllers.CheckoutController
 	Orders      *controllers.OrderController
 	Commissions *controllers.CommissionController
+	Payouts     *controllers.PayoutController
 	Users       *controllers.UserController
 	Health      *controllers.HealthController
 }
@@ -54,6 +55,7 @@ func SetupRoutes(app *fiber.App, c Controllers) {
 
 	// Ledger de comisiones del distribuidor autenticado.
 	app.Get("/api/commissions/mine", auth, c.Commissions.MyCommissions)
+	app.Get("/api/payouts/mine", auth, c.Payouts.MyPayouts)
 
 	// Compra: el comprador se toma del token. /api/orders se conserva como alias de
 	// /api/checkout para no romper clientes de la Fase 2.
@@ -68,6 +70,9 @@ func SetupRoutes(app *fiber.App, c Controllers) {
 	// Solo administrador.
 	app.Get("/api/users", auth, adminOnly, c.Users.GetUsers)
 	app.Patch("/api/users/:id", auth, adminOnly, c.Users.UpdateUser)
+	app.Get("/api/payouts", auth, adminOnly, c.Payouts.ListPayouts)
+	app.Post("/api/payouts", auth, adminOnly, c.Payouts.CreatePayout)
+	app.Get("/api/reports/pending-commissions", auth, adminOnly, c.Payouts.PendingCommissions)
 	app.Get("/api/orders", auth, adminOnly, c.Orders.ListOrders)
 	app.Patch("/api/orders/:id/status", auth, adminOnly, c.Orders.UpdateStatus)
 	app.Get("/api/admin/products", auth, adminOnly, c.Products.GetAdminProducts)

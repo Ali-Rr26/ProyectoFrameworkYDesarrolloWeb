@@ -93,6 +93,7 @@ func main() {
 		Checkout:    controllers.NewCheckoutController(repo, redisCache, networkCache, commissions, cfg.CheckoutCommitDelay),
 		Orders:      controllers.NewOrderController(repo, redisCache, networkCache),
 		Commissions: controllers.NewCommissionController(repo),
+		Payouts:     controllers.NewPayoutController(repo),
 		Users:       controllers.NewUserController(repo, networkCache),
 		Health:      controllers.NewHealthController(repo, redisCache),
 	}

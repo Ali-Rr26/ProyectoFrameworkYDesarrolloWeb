@@ -95,6 +95,8 @@ func repoError(c *fiber.Ctx, err error) error {
 		return apiError(c, fiber.StatusBadRequest, "Transición de estado inválida", detail)
 	case errors.Is(err, repository.ErrCommissionsPaid):
 		return apiError(c, fiber.StatusConflict, "El pedido tiene comisiones ya liquidadas y no se puede cancelar", detail)
+	case errors.Is(err, repository.ErrNothingToPay):
+		return apiError(c, fiber.StatusConflict, "No hay comisiones listas para liquidar (solo se pagan pedidos entregados)", detail)
 	case errors.Is(err, repository.ErrInvalidReferral):
 		return apiError(c, fiber.StatusBadRequest, "Código de referido inválido", detail)
 	case errors.Is(err, repository.ErrProductInactive):

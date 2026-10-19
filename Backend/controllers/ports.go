@@ -49,6 +49,13 @@ type CommissionQueryRepository interface {
 	ListUserCommissions(ctx context.Context, userID, page, limit int) (*models.CommissionLedger, error)
 }
 
+// PayoutRepository es el acceso a datos de las liquidaciones y la deuda por distribuidor.
+type PayoutRepository interface {
+	CreatePayout(ctx context.Context, beneficiaryID int) (*models.Payout, error)
+	ListPayouts(ctx context.Context, beneficiaryID *int, page, limit int) (*models.Page[models.Payout], error)
+	GetPendingDebts(ctx context.Context) ([]models.PendingDebt, error)
+}
+
 // UserRepository es el acceso a datos de cuentas.
 type UserRepository interface {
 	GetUsers(ctx context.Context) ([]models.User, error)
