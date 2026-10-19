@@ -56,6 +56,13 @@ type PayoutRepository interface {
 	GetPendingDebts(ctx context.Context) ([]models.PendingDebt, error)
 }
 
+// ReportRepository son las consultas agregadas de los reportes del Dashboard.
+type ReportRepository interface {
+	GetSalesSummary(ctx context.Context, period models.DateRange) (*models.SalesSummary, error)
+	GetTopProducts(ctx context.Context, period models.DateRange, limit int) ([]models.TopProduct, error)
+	GetTopSponsors(ctx context.Context, period models.DateRange, limit int) ([]models.TopSponsor, error)
+}
+
 // UserRepository es el acceso a datos de cuentas.
 type UserRepository interface {
 	GetUsers(ctx context.Context) ([]models.User, error)

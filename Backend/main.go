@@ -8,6 +8,8 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	// Base de zonas horarias embebida: la imagen alpine no trae tzdata y APP_TIMEZONE la necesita.
+	_ "time/tzdata"
 
 	// Importamos el framework principal Fiber.
 	"github.com/gofiber/fiber/v2"
@@ -94,6 +96,7 @@ func main() {
 		Orders:      controllers.NewOrderController(repo, redisCache, networkCache),
 		Commissions: controllers.NewCommissionController(repo),
 		Payouts:     controllers.NewPayoutController(repo),
+		Reports:     controllers.NewReportController(repo, cfg.Location),
 		Users:       controllers.NewUserController(repo, networkCache),
 		Health:      controllers.NewHealthController(repo, redisCache),
 	}

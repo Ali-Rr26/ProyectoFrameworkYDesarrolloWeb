@@ -11,7 +11,7 @@ func setRequired(t *testing.T) {
 	t.Helper()
 	t.Setenv("DATABASE_URL", "postgres://u:p@localhost:5432/db")
 	t.Setenv("JWT_SECRET", "un-secreto-de-prueba-de-al-menos-32-caracteres")
-	for _, key := range []string{"PORT", "JWT_TTL", "APP_ENV", "CHECKOUT_FAIL_AT", "CHECKOUT_COMMIT_DELAY"} {
+	for _, key := range []string{"PORT", "JWT_TTL", "APP_ENV", "APP_TIMEZONE", "CHECKOUT_FAIL_AT", "CHECKOUT_COMMIT_DELAY"} {
 		t.Setenv(key, "")
 	}
 }
@@ -31,6 +31,17 @@ func TestLoadDefaults(t *testing.T) {
 	}
 	if cfg.AppEnv != EnvProduction || cfg.IsDev() {
 		t.Errorf("AppEnv=%q; sin APP_ENV debe ser production (detalles ocultos)", cfg.AppEnv)
+	}
+	if cfg.Location == nil || cfg.Location.String() != DefaultTimezone {
+		t.Errorf("Location=%v; se esperaba %s", cfg.Location, DefaultTimezone)
+	}
+}
+
+func TestLoadRejectsInvalidTimezone(t *testing.T) {
+	setRequired(t)
+	t.Setenv("APP_TIMEZONE", "Marte/Olympus")
+	if _, err := Load(); err == nil {
+		t.Fatal("con una zona horaria inexistente Load debe fallar")
 	}
 }
 

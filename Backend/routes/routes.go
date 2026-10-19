@@ -18,6 +18,7 @@ type Controllers struct {
 	Orders      *controllers.OrderController
 	Commissions *controllers.CommissionController
 	Payouts     *controllers.PayoutController
+	Reports     *controllers.ReportController
 	Users       *controllers.UserController
 	Health      *controllers.HealthController
 }
@@ -72,6 +73,9 @@ func SetupRoutes(app *fiber.App, c Controllers) {
 	app.Patch("/api/users/:id", auth, adminOnly, c.Users.UpdateUser)
 	app.Get("/api/payouts", auth, adminOnly, c.Payouts.ListPayouts)
 	app.Post("/api/payouts", auth, adminOnly, c.Payouts.CreatePayout)
+	app.Get("/api/reports/summary", auth, adminOnly, c.Reports.Summary)
+	app.Get("/api/reports/top-products", auth, adminOnly, c.Reports.TopProducts)
+	app.Get("/api/reports/top-sponsors", auth, adminOnly, c.Reports.TopSponsors)
 	app.Get("/api/reports/pending-commissions", auth, adminOnly, c.Payouts.PendingCommissions)
 	app.Get("/api/orders", auth, adminOnly, c.Orders.ListOrders)
 	app.Patch("/api/orders/:id/status", auth, adminOnly, c.Orders.UpdateStatus)

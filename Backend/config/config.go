@@ -30,6 +30,9 @@ type Config struct {
 	JWTSecret string
 	// JWTTTL es la vigencia de cada token emitido.
 	JWTTTL time.Duration
+	// Location es la zona horaria del negocio (APP_TIMEZONE, por defecto America/Guayaquil):
+	// los reportes interpretan sus fechas en ella, no en la del servidor (UTC en Docker).
+	Location *time.Location
 	// CheckoutFailAt activa una falla simulada en la transacción del checkout para
 	// demostrar el ROLLBACK en clase ("" desactivada, "after_order" o "after_items").
 	CheckoutFailAt string
@@ -37,6 +40,9 @@ type Config struct {
 	// detener el contenedor de PostgreSQL a mitad de la compra (0 desactivada).
 	CheckoutCommitDelay time.Duration
 }
+
+// DefaultTimezone es la zona horaria del negocio cuando no se define APP_TIMEZONE.
+const DefaultTimezone = "America/Guayaquil"
 
 // DefaultPort es el puerto HTTP cuando no se define PORT.
 const DefaultPort = "4000"
@@ -70,6 +76,11 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("JWT_TTL inválido: %w", err)
 	}
 
+	loc, err := time.LoadLocation(getEnv("APP_TIMEZONE", DefaultTimezone))
+	if err != nil {
+		return nil, fmt.Errorf("APP_TIMEZONE inválida: %w", err)
+	}
+
 	commitDelay, err := time.ParseDuration(getEnv("CHECKOUT_COMMIT_DELAY", "0s"))
 	if err != nil || commitDelay < 0 {
 		return nil, fmt.Errorf("CHECKOUT_COMMIT_DELAY inválido: %q", os.Getenv("CHECKOUT_COMMIT_DELAY"))
@@ -88,6 +99,7 @@ func Load() (*Config, error) {
 		NetworkRootEmail: getEnv("NETWORK_ROOT_EMAIL", "cliente@upse.edu.ec"),
 		JWTSecret:        os.Getenv("JWT_SECRET"),
 		JWTTTL:           ttl,
+		Location:         loc,
 
 		CheckoutFailAt:      failAt,
 		CheckoutCommitDelay: commitDelay,
