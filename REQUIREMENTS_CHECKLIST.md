@@ -137,7 +137,7 @@ React SPA (:5173) ──► Caddy/Nginx (U4: proxy inverso + SSL)
 - [ ] Vitest + `fake-indexeddb` configurado — falta ejecutar `npm run test`
 
 ## PWA-F1 · Íconos
-- [ ] `@vite-pwa/assets-generator` (`npm run icons`): 192, 512, maskable, `apple-touch-icon`, `favicon.ico`
+- [x] `@vite-pwa/assets-generator` (`npm run icons`) desde logo propio `favicon.svg`: 64, 192, 512, maskable, `apple-touch-icon`, `favicon.ico` + enlaces en `index.html`
 
 ## PWA-F2 · Service worker propio y manifest (instalable)
 - [ ] `injectManifest` con `src/sw.ts` (`precacheAndRoute`, `NavigationRoute`, `SKIP_WAITING`) + manifest `standalone`; interfaz abre offline

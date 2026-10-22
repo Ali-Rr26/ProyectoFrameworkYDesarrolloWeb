@@ -64,9 +64,11 @@
 
 > Set de íconos para el prompt de instalación en Chrome/Android/iOS.
 
-- [ ] `@vite-pwa/assets-generator` + script `npm run icons` desde `public/favicon.svg`
-- [ ] `pwa-192x192.png`, `pwa-512x512.png`, `maskable-icon-512x512.png` (zona segura ≥10 %), `apple-touch-icon-180x180.png`, `favicon.ico`
-- [ ] `<link rel="apple-touch-icon">` en `index.html`
+- [x] `@vite-pwa/assets-generator` 2.0 + `pwa-assets.config.ts` (preset `minimal2023`) + script `npm run icons` desde `public/favicon.svg`
+- [x] Logo propio en `public/favicon.svg` (reemplaza el logo de Vite): "M" blanca con nodos de red sobre turquesa de marca
+- [x] `pwa-64x64.png`, `pwa-192x192.png`, `pwa-512x512.png`, `maskable-icon-512x512.png` (margen 30 %, fondo de marca), `apple-touch-icon-180x180.png` (fondo de marca), `favicon.ico` 48 — revisados visualmente
+- [x] `index.html`: `favicon.ico` de respaldo, `favicon.svg` (`sizes="any"`) y `<link rel="apple-touch-icon">`
+- [ ] Prueba de los enlaces en `pwa.test.ts` — falta ejecutar `npm run test`
 
 ## FASE 2 — Service worker propio y manifest (instalable)
 
@@ -189,7 +191,7 @@ trigger; máquina de estados de pedidos; `APIError{status,message,details}`.
 | Fase | Entregable | Estado |
 |---|---|---|
 | 0 | Metadatos, identidad PWA, Vitest | 🟡 Implementada (`tsc -b` y lint OK) — falta ejecutar `npm run test` |
-| 1 | Íconos generados | ⬜ Pendiente |
+| 1 | Íconos generados | 🟡 Implementada (`tsc -b` y lint OK) — falta ejecutar `npm run test` |
 | 2 | SW `injectManifest` + manifest → instalable, interfaz offline | ⬜ Pendiente |
 | 3 | Caché HTTP pública (catálogo, imágenes) | ⬜ Pendiente |
 | 4 | IndexedDB (Dexie): catálogo local + borradores | ⬜ Pendiente |

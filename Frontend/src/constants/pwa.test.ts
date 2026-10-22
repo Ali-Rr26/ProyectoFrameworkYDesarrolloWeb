@@ -18,6 +18,11 @@ describe('PWA_IDENTITY', () => {
     expect(indexHtml).toContain(`<meta name="theme-color" content="${PWA_IDENTITY.themeColor}" />`);
     expect(indexHtml).toContain(`<html lang="${PWA_IDENTITY.lang}">`);
   });
+
+  it('enlaza los íconos generados (favicon.ico de respaldo y apple-touch-icon)', () => {
+    expect(indexHtml).toContain('<link rel="icon" href="/favicon.ico" sizes="48x48" />');
+    expect(indexHtml).toContain('<link rel="apple-touch-icon" href="/apple-touch-icon-180x180.png" />');
+  });
 });
 
 describe('entorno de pruebas', () => {
