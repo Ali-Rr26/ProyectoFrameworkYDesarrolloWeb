@@ -1,19 +1,17 @@
 // src/components/Catalog.tsx
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useCart } from '../context/cart';
-import { getProducts } from '../services/productService';
+import { useCatalog } from '../offline/useCatalog';
 import CustomSelect from './CustomSelect';
-import type { Product } from '../data/products';
 
 // Opción del filtro que muestra todas las categorías (texto visible en la interfaz)
 const ALL_CATEGORIES = 'Todas';
 
 const Catalog = () => {
   const { addToCart, getQuantityInCart } = useCart();
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string>('');
+  // Catálogo desde la copia local (IndexedDB), refrescada con la red: funciona sin conexión.
+  const { products, loading, error } = useCatalog();
 
   // Lectura del query string (?category=...) enviado desde el Storefront
   const [searchParams, setSearchParams] = useSearchParams();
@@ -27,22 +25,6 @@ const Catalog = () => {
     const names = products.map((product) => product.category);
     return Array.from(new Set(names)).sort();
   }, [products]);
-
-  useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        const data = await getProducts();
-        setProducts(data);
-      } catch (err) {
-        setError('No se pudieron cargar los productos');
-        console.error('Error fetch:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchProducts();
-  }, []);
 
   // Filtrado con useMemo: solo se recalcula cuando cambian search/category/products
   const filteredProducts = useMemo(() => {
@@ -72,7 +54,7 @@ const Catalog = () => {
   }
 
   if (error) {
-    return <div className="text-center text-red-600">{error}</div>;
+    return <div className="text-center text-red-600">No se pudieron cargar los productos</div>;
   }
 
   return (

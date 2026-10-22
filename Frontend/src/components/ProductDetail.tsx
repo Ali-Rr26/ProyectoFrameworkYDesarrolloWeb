@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { getProductById } from '../services/productService';
-import type { Product } from '../data/products';
+import { useLocalProduct } from '../offline/useCatalog';
 import { useCart } from '../context/cart';
 
 const ProductDetail = () => {
@@ -9,27 +8,11 @@ const ProductDetail = () => {
   const navigate = useNavigate();
   const { addToCart, getQuantityInCart } = useCart();
 
-  const [product, setProduct] = useState<Product | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  // Copia local al instante (también sin conexión) y confirmación con el servidor.
+  const { product, loading } = useLocalProduct(Number(id));
   const [activeImage, setActiveImage] = useState<number>(0);
   const [lightboxOpen, setLightboxOpen] = useState<boolean>(false);
   const [added, setAdded] = useState<boolean>(false);
-
-  useEffect(() => {
-    let active = true;
-    getProductById(Number(id))
-      .then((data) => {
-        if (!active) return;
-        setProduct(data);
-        setLoading(false);
-      })
-      .catch(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [id]);
 
   // Cerrar el lightbox con la tecla Escape
   useEffect(() => {

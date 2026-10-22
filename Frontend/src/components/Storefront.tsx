@@ -1,25 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/auth';
-import { getProducts } from '../services/productService';
-import type { Product } from '../data/products';
+import { useCatalog } from '../offline/useCatalog';
 
 const Storefront = () => {
   const { user } = useAuth();
-  const [featured, setFeatured] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<string[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-
-  useEffect(() => {
-    getProducts()
-      .then((data) => {
-        setFeatured(data.slice(0, 4));
-        const names = data.map((product) => product.category);
-        setCategories(Array.from(new Set(names)).sort());
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  }, []);
+  // Catálogo desde la copia local (IndexedDB), refrescada con la red: funciona sin conexión.
+  const { products, loading } = useCatalog();
+  const featured = products.slice(0, 4);
+  const categories = useMemo(
+    () => Array.from(new Set(products.map((product) => product.category))).sort(),
+    [products],
+  );
 
   return (
     <div>

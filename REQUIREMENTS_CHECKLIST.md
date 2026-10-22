@@ -126,7 +126,7 @@ React SPA (:5173) ──► Caddy/Nginx (U4: proxy inverso + SSL)
 
 # PWA — MultiCatálogo offline-first
 
-> Plan detallado, decisiones (D1–D12) y verificación por ítem en **`PLAN_PWA.md`**.
+> Plan detallado, decisiones (D1–D13) y verificación por ítem en **`PLAN_PWA.md`**.
 > Resumen: `vite-plugin-pwa` en modo `injectManifest` (SW propio con Workbox),
 > IndexedDB con Dexie, outbox con `Idempotency-Key` y motor de sincronización en la
 > página (Background Sync solo como acelerador), conflictos resueltos por tipo de
@@ -144,23 +144,27 @@ React SPA (:5173) ──► Caddy/Nginx (U4: proxy inverso + SSL)
 - [ ] Verificación en navegador: instalable y la interfaz abre offline (`npm run build && npm run preview`)
 
 ## PWA-F3 · Caché HTTP pública
-- [x] Catálogo `StaleWhileRevalidate`, imágenes `CacheFirst` (60 entradas), nada con `Authorization` ni métodos de escritura en Cache Storage — reglas puras en `src/pwa/cacheRules.ts`
+- [x] Catálogo `NetworkFirst` (antes `StaleWhileRevalidate`, cambiado en F4), imágenes `CacheFirst` (60 entradas), nada con `Authorization` ni métodos de escritura en Cache Storage — reglas puras en `src/pwa/cacheRules.ts`
 - [ ] Pruebas de `cacheRules` (`npm run test`) y verificación de Cache Storage en navegador
 
 ## PWA-F4 · Capa local IndexedDB (Dexie)
-- [ ] `OfflineDB` (`products`, `categories`, `meta`, `drafts`, `outbox`), catálogo local con `useLiveQuery`, `useDraft`, `storage.persist()`, limpieza por usuario al cerrar sesión
+- [x] `OfflineDB` (`products`, `meta`, `drafts`, `outbox`), catálogo local con `useLiveQuery` en `Storefront`/`Catalog`/`ProductDetail`, `useDraft` en `Checkout`/`ProductForm`/`Register`, `storage.persist()`, limpieza por usuario al cerrar sesión
+- [ ] Pruebas de la capa local (`npm run test`) y verificación offline en navegador
 
 ## PWA-F5 · Backend preparado para sincronizar
 - [ ] Migración `0006_sync.sql` (`products.version`/`updated_at`, `idempotency_keys`), middleware `Idempotency`, `409` por `version`, `expectedTotal` y `fromStatus`, pruebas Go
 
 ## PWA-F6 · Outbox y motor de sincronización
-- [ ] `enqueue` con UUID, estados `pending/syncing/done/conflict/failed`, FIFO por usuario, `navigator.locks`, backoff, pausa en `401`, disparo por `online`/arranque/login/Background Sync
+- [ ] `NetworkError` en `apiClient`, `enqueue` con UUID, estados `pending/syncing/done/conflict/failed`, FIFO por usuario, `navigator.locks`, backoff, pausa en `401`, disparo por `online`/arranque/login/Background Sync, botón "Sincronizar ahora" en `Navbar`, `Checkout` sin red → "Guardar pedido"
 
 ## PWA-F7 · Resolución de conflictos
 - [ ] Checkout re-confirmado con stock/precio del servidor, comparación campo a campo en productos, estado de pedido validado, vista `/pending`
 
-## PWA-F8 · Experiencia offline, actualizaciones e instalación
-- [ ] `useOnlineStatus` + banner, `NetworkError` en `apiClient`, vistas "Requiere conexión", `ReloadPrompt`, `useInstallPrompt`, `safe-area-inset`, prueba offline → online sin pedidos duplicados
+## PWA-F8 · Lectura sin conexión de datos privados
+- [ ] Tabla `snapshots` (esquema v2), `withSnapshot` + `useSnapshotQuery`, aviso "datos guardados el {fecha}" / "Requiere conexión" en `Dashboard`, `MyOrders`, `MyNetwork`, comisiones, liquidaciones y listados admin; pendientes del outbox visibles en su vista; limpieza al cerrar sesión y caducidad 7 días
 
-## PWA-F9 · HTTPS y validación final (depende de U4)
+## PWA-F9 · Experiencia offline, actualizaciones e instalación
+- [ ] `useOnlineStatus` + banner, login/registro "Requiere conexión", `ReloadPrompt`, `useInstallPrompt`, `safe-area-inset`, prueba offline → online sin pedidos duplicados
+
+## PWA-F10 · HTTPS y validación final (depende de U4)
 - [ ] HTTPS mismo dominio, cabeceras de caché, imágenes con CORS, Lighthouse ≥ 90, pruebas en Android/escritorio/iOS, `PROJECT_MAP.md`

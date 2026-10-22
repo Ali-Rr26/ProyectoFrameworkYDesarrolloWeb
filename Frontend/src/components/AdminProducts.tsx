@@ -77,7 +77,8 @@ const AdminProducts = () => {
     setForm(next);
   };
 
-  const handleSubmit = async (input: ProductInput) => {
+  // Devuelve true si se guardó: ProductForm borra entonces su borrador local.
+  const handleSubmit = async (input: ProductInput): Promise<boolean> => {
     setSaving(true);
     setError('');
     setFieldErrors({});
@@ -90,6 +91,7 @@ const AdminProducts = () => {
         setVersion((v) => v + 1);
       }
       setForm({ mode: 'closed' });
+      return true;
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message);
@@ -97,6 +99,7 @@ const AdminProducts = () => {
       } else {
         setError('No se pudo guardar el producto');
       }
+      return false;
     } finally {
       setSaving(false);
     }

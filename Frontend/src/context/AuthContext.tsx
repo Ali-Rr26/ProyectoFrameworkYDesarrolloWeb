@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { setAuthToken, setUnauthorizedHandler } from '../services/apiClient';
 import { getMe } from '../services/userService';
+import { requestPersistentStorage } from '../offline/userData';
 import { AuthContext, type User } from './auth';
 
 // 1. Sesión completa: usuario + JWT + fecha de expiración del token
@@ -53,6 +54,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       // Sin almacenamiento disponible la sesión dura solo mientras la página esté abierta.
     }
     setSession(newSession);
+    // Que el navegador no borre los datos locales (borradores, pendientes) por falta de espacio.
+    void requestPersistentStorage();
   };
 
   const logout = useCallback(() => {

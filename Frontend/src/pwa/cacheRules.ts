@@ -10,7 +10,7 @@ export const CACHE_NAMES = {
   images: 'images',
 } as const;
 
-export const CATALOG_CACHE = { maxEntries: 50, maxAgeSeconds: 24 * 60 * 60 } as const;
+export const CATALOG_CACHE = { maxEntries: 50, maxAgeSeconds: 24 * 60 * 60, networkTimeoutSeconds: 5 } as const;
 export const IMAGES_CACHE = { maxEntries: 60, maxAgeSeconds: 30 * 24 * 60 * 60 } as const;
 
 // Datos mínimos de una petición para decidir su estrategia.

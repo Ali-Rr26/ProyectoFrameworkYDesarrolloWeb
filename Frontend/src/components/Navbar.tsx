@@ -5,6 +5,8 @@ import { useAuth } from "../context/auth";
 import { Menu, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { ICON_SIZES } from '../constants/ui';
 import { ROLE_LABELS } from '../data/constants';
+import { draftOwner } from '../offline/drafts';
+import { clearUserData, countPending } from '../offline/userData';
 
 interface NavbarProps {
   onMenuClick: () => void;
@@ -19,7 +21,21 @@ const Navbar = ({ onMenuClick, onToggleCollapse, isCollapsed }: NavbarProps) => 
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const handleLogout = () => {
+  // Cierre de sesión manual: borra borradores y pendientes locales del usuario.
+  // Si quedan registros sin enviar al servidor, se pide confirmación antes de perderlos.
+  const handleLogout = async () => {
+    const owner = draftOwner(user?.email);
+    const pending = await countPending(owner).catch(() => 0);
+    if (
+      pending > 0 &&
+      !window.confirm(
+        `Tienes ${pending} ${pending === 1 ? "registro" : "registros"} sin enviar al servidor. ` +
+          "Si cierras sesión se perderán. ¿Cerrar sesión de todos modos?"
+      )
+    ) {
+      return;
+    }
+    await clearUserData(owner).catch(() => undefined);
     logout();
     navigate("/login");
   };

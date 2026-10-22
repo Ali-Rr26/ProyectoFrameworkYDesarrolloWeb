@@ -42,10 +42,11 @@
 | D10 | Origen de la API | `urlPattern` construido desde `VITE_API_URL` ahora; mismo dominio (`/api` tras el proxy) en U4 | Mismo origen simplifica las reglas del SW y elimina CORS. |
 | D11 | Imágenes externas | `CacheFirst` con `maxEntries: 60` ahora; origen propio/CDN con CORS en U4 | Las respuestas opacas (picsum, URLs del admin) ocupan ~7 MB de cuota cada una en Chrome. |
 | D12 | Pruebas del frontend | Añadir **Vitest** (+ `fake-indexeddb`) | El motor de sync, el clasificador de errores y el backoff son funciones puras y deben probarse sin navegador. |
+| D13 | Datos privados sin conexión (pedidos, red, comisiones, liquidaciones, reportes, listados admin) | **Instantáneas de solo lectura por usuario** en IndexedDB (Fase 8), con fecha visible | Antes eran "solo online" y fallaban sin red. Se muestra la última respuesta vista con red ("Datos del …"); nunca se usa ante `401`/`403`, caduca a los 7 días y se borra al cerrar sesión. Las escrituras siguen D8. |
 
 > Fuera de alcance: notificaciones push (requieren VAPID en el backend), Periodic
-> Background Sync, sincronización de reportes/red/comisiones offline (solo lectura online),
-> cifrado de IndexedDB.
+> Background Sync, **escritura** offline de liquidaciones, usuarios y registro (D8; su
+> lectura offline sí se cubre en la Fase 8), cifrado de IndexedDB.
 
 ---
 
@@ -91,7 +92,7 @@
 
 - [x] `npm i -D workbox-strategies workbox-expiration workbox-cacheable-response` (7.4.1)
 - [x] Reglas puras en `src/pwa/cacheRules.ts` (`isPublicCatalogRequest`, `isImageRequest`, `CACHE_NAMES`, límites) — el SW solo las conecta; origen de la API tomado de `API_URL` (`VITE_API_URL`)
-- [x] `GET {VITE_API_URL}/api/products`, `/api/products/:id` y `/api/categories` → `StaleWhileRevalidate` (caché `api-catalog`, solo `200`, 1 día, `maxEntries` 50, `purgeOnQuotaError`); `/api/admin/products` excluida
+- [x] `GET {VITE_API_URL}/api/products`, `/api/products/:id` y `/api/categories` → `NetworkFirst` (timeout 5 s, caché `api-catalog`, solo `200`, 1 día, `maxEntries` 50, `purgeOnQuotaError`); `/api/admin/products` excluida — **cambiado en la Fase 4**: era `StaleWhileRevalidate`, pero entregaba al refresco de IndexedDB la copia vieja del SW; ahora la red manda y el SW queda como respaldo sin conexión
 - [x] Imágenes (`request.destination === 'image'`) → `CacheFirst` (caché `images`, `maxEntries` 60, 30 días, `CacheableResponsePlugin({ statuses: [0, 200] })`, `purgeOnQuotaError`)
 - [x] Toda petición con cabecera `Authorization` o método distinto de `GET` → sin ruta registrada: el SW no la intercepta y va directo a la red
 - [x] `tsconfig.sw.json` incluye `src/vite-env.d.ts` (tipos de `import.meta.env` para `API_URL`)
@@ -102,17 +103,21 @@
 
 > Base local para consultar sin conexión y guardar lo que el usuario escribe.
 
-- [ ] `npm i dexie dexie-react-hooks`
-- [ ] `src/offline/db.ts`: clase `OfflineDB` con esquema versionado:
-  - `products` (`id`, `categoryId`, `name`) y `categories` — copia del catálogo público
-  - `meta` (`key`) — `catalogSyncedAt`, versión de esquema
-  - `drafts` (`[userId+formKey]`) — borradores de formularios
-  - `outbox` (`id` = Idempotency-Key, `userId`, `status`, `createdAt`) — registros pendientes
-- [ ] `src/offline/catalogStore.ts`: refresco completo del catálogo al iniciar y al volver online; `Catalog`, `Storefront` y `ProductDetail` leen de Dexie (`useLiveQuery`) con la red como fuente de refresco
-- [ ] Hook `useDraft(formKey)`: autoguardado con debounce en `Checkout`, `ProductForm` y `Register` (nunca se guardan contraseñas)
-- [ ] `navigator.storage.persist()` al instalar/iniciar sesión, para que el navegador no borre los datos por presión de espacio
-- [ ] Logout: borra `drafts` y `outbox` del usuario; si hay pendientes, confirmación previa ("Tienes N registros sin enviar")
-- [ ] Pruebas Vitest: esquema, borradores, limpieza por usuario
+- [x] `npm i dexie@4.4.6 dexie-react-hooks@4.4.0`
+- [x] `src/offline/db.ts`: clase `OfflineDB` (versión 1 del esquema; nombre configurable para pruebas):
+  - `products` (`id`, `position`) — copia del catálogo público; `position` conserva el orden del servidor. Sin tabla `categories`: las vistas derivan las categorías de los productos (como ya hacían)
+  - `meta` (`key`) — `catalogSyncedAt`
+  - `drafts` (`[userId+formKey]`, `userId`) — borradores de formularios
+  - `outbox` (`id` = Idempotency-Key, `userId`, `status`, `createdAt`, `[userId+status]`) — esquema listo para la Fase 6
+- [x] Dueño de los datos locales = correo normalizado (`draftOwner`); `anonymous` sin sesión (registro)
+- [x] `src/offline/catalogStore.ts`: `refreshCatalog` (reemplazo completo en transacción, una sola petición si hay llamadas simultáneas, copia intacta si la red falla) y `refreshProduct` (actualiza o borra el producto)
+- [x] Hooks `useCatalog` / `useLocalProduct` (`src/offline/useCatalog.ts`): `Storefront`, `Catalog` y `ProductDetail` leen de Dexie con `useLiveQuery`; refresco al montar y en el evento `online`
+- [x] Hook `useDraft(formKey, initial, { exclude })`: restaura el borrador al montar, guarda solo cambios del usuario con debounce de 400 ms y `clearDraft()` al enviar con éxito o cancelar. Usado en `Checkout` (`checkout`), `ProductForm` (`product:new` / `product:{id}`) y `Register` (`register`; la contraseña queda fuera y el `?ref=` del link manda sobre el borrador)
+- [x] Métodos de pago con copia local (`src/offline/paymentMethods.ts`, `meta.paymentMethods`): red primero y última lista guardada sin conexión; `Checkout` los usa (antes fallaba offline con "No se pudieron cargar los métodos de pago")
+- [x] `navigator.storage.persist()` al iniciar sesión (`requestPersistentStorage` en `AuthContext.login`)
+- [x] Logout manual (`Navbar`): cuenta pendientes, pide confirmación si hay ("Tienes N registros sin enviar…") y borra `drafts` y `outbox` del usuario; el catálogo se conserva. El cierre automático (token vencido/401) NO borra: los pendientes esperan al mismo usuario
+- [ ] Pruebas Vitest (`catalogStore`, `drafts`, `userData`, `paymentMethods`) — falta ejecutar `npm run test`
+- [ ] Verificación en navegador: visitar `/catalog` con red → DevTools → IndexedDB `multicatalogo` con `products`; Network "Offline" + recarga en `/store`, `/catalog`, `/product/:id` → se ven los productos; escribir en `/checkout`, recargar → los datos siguen; cerrar sesión → `drafts` del usuario vacío
 
 ## FASE 5 — Backend preparado para sincronizar
 
@@ -141,6 +146,7 @@ trigger; máquina de estados de pedidos; `APIError{status,message,details}`.
 
 > Las escrituras offline se guardan como registros pendientes y se envían en orden.
 
+- [ ] `apiClient.ts`: distinguir fallo de red (`TypeError` de `fetch`) de `ApiError` con un `NetworkError` propio — lo usan el outbox (decide encolar) y las instantáneas de la Fase 8 (movido desde la antigua Fase 8)
 - [ ] `src/offline/outbox.ts`: `enqueue({ type, method, path, payload, baseVersion })` genera el UUID (`crypto.randomUUID()`) que viaja como `Idempotency-Key`
 - [ ] Estados del registro: `pending → syncing → done | conflict | failed`; `attempts`, `lastError`, `nextAttemptAt`
 - [ ] `src/offline/syncEngine.ts` (corre en la página, usa `apiFetch` con el JWT actual):
@@ -152,9 +158,10 @@ trigger; máquina de estados de pedidos; `APIError{status,message,details}`.
   - `401` → pausa hasta nuevo login ("Inicia sesión para enviar N pendientes")
   - `409` → `conflict` (Fase 7)
   - `400`/`403`/`422` → `failed` (requiere corrección del usuario)
-- [ ] Disparadores: arranque de la app, evento `online`, tras login, botón "Sincronizar ahora"
+- [ ] Disparadores: arranque de la app, evento `online`, tras login, botón **"Sincronizar ahora"** en `Navbar` (visible con pendientes, con contador; deshabilitado sin red)
 - [ ] SW: al encolar, la página registra `sync` (`registration.sync.register('outbox')`) si existe; en el evento `sync` el SW avisa a las pestañas abiertas (`clients.matchAll` + `postMessage`) para que ejecuten el motor
 - [ ] Componentes con escritura offline usan `enqueue` cuando no hay red: `Checkout`, `ProductForm`, cambio de estado en `AdminOrders`; con red siguen enviando directo (con `Idempotency-Key` igualmente)
+- [ ] `Checkout` sin red: el botón pasa a **"Guardar pedido"**; al pulsarlo el pedido queda en el outbox, se vacía el carrito y se muestra "Pedido guardado: se enviará al volver la conexión" (la confirmación con número `MC-…` llega tras sincronizar)
 - [ ] Pruebas Vitest: orden FIFO, backoff, clasificador, pausa por `401`, no envío entre usuarios
 
 ## FASE 7 — Resolución de conflictos
@@ -168,17 +175,37 @@ trigger; máquina de estados de pedidos; `APIError{status,message,details}`.
 - [ ] Vista `/pending` ("Pendientes de envío"): lista del outbox con estado, error, reintentar, editar o descartar; contador en `Navbar`/`Sidebar`
 - [ ] Funciones puras de comparación/combinación con pruebas Vitest
 
-## FASE 8 — Experiencia offline, actualizaciones e instalación
+## FASE 8 — Lectura sin conexión de datos privados (instantáneas por usuario)
+
+> Las vistas privadas muestran sin conexión la última versión vista con red, marcada
+> con su fecha. Solo lectura: las escrituras siguen D8 (outbox o solo online).
+
+**Ya existe:** `OfflineDB` (Fase 4), `draftOwner`/`clearUserData`, cliente HTTP único
+`apiFetch`, `NetworkError` (Fase 6).
+
+- [ ] Esquema v2 de `OfflineDB`: tabla `snapshots` (`[userId+key]`, `userId`, `savedAt`) con la última respuesta de cada consulta
+- [ ] `src/offline/snapshots.ts`: `withSnapshot(key, fetcher)` — red primero y guarda; ante `NetworkError` devuelve la instantánea con su `savedAt`; ante `401`/`403` nunca usa la instantánea (borra la del usuario si es `401`)
+- [ ] Hook `useSnapshotQuery(key, fetcher, deps)` → `{ data, loading, error, savedAt, fromSnapshot }`; la clave incluye página, filtros y rango (`orders:mine?page=1`, `reports:summary?range=last_30_days`)
+- [ ] Vistas cubiertas:
+  - cliente/distribuidor: `MyOrders` (`/api/orders/mine`), `MyNetwork` (`/api/network`), `CommissionsPanel` (`/api/commissions/mine`), `PayoutsPanel` (`/api/payouts/mine`)
+  - admin: `Dashboard` (`/api/reports/summary`, `top-products`, `top-sponsors`, `pending-commissions`), `AdminOrders` (`/api/orders`), `AdminPayouts` (`/api/payouts`, `pending-commissions`), `AdminUsers` (`/api/users`), `AdminProducts` (`/api/admin/products`)
+- [ ] Aviso por vista: "Sin conexión — datos guardados el {fecha}"; sin instantánea para esa consulta → "Requiere conexión" (en vez del error genérico)
+- [ ] Paginación y búsqueda sin conexión: solo las combinaciones ya visitadas; el resto muestra "Requiere conexión"
+- [ ] Pendientes del outbox visibles en su vista: pedidos guardados sin red en `MyOrders` como "Pendiente de envío"; ediciones de producto con insignia en `AdminProducts`; cambios de estado en `AdminOrders`
+- [ ] Botones de escritura solo online (crear liquidación, editar usuario, dar de baja) deshabilitados sin red con explicación
+- [ ] Seguridad: instantáneas por usuario; `clearUserData` también borra `snapshots`; caducidad 7 días y límite de entradas por usuario; nunca se guardan `/api/login` ni `/api/me`
+- [ ] Pruebas Vitest: red/instantánea, sin instantánea, `401`/`403`, caducidad, limpieza por usuario
+
+## FASE 9 — Experiencia offline, actualizaciones e instalación
 
 - [ ] Hook `useOnlineStatus` + banner "Sin conexión — trabajando con datos guardados" en `Layout`
-- [ ] `apiClient.ts`: distinguir fallo de red (`TypeError` de `fetch`) de `ApiError`; marca `NetworkError` para que los componentes decidan encolar
-- [ ] Vistas solo online (reportes, red, comisiones, liquidaciones, usuarios admin, registro, login) muestran "Requiere conexión" en vez de error genérico
+- [ ] Login y registro (solo online) muestran "Requiere conexión" en vez de error genérico (las vistas privadas ya lo resuelve la Fase 8)
 - [ ] `ReloadPrompt` con `useRegisterSW`: "Nueva versión disponible — Recargar"; no se ofrece durante `/checkout` ni con sincronización en curso
 - [ ] Hook `useInstallPrompt` (`beforeinstallprompt`) + botón "Instalar app" (oculto en `display-mode: standalone`); instrucción para iOS
 - [ ] `safe-area-inset` en barras fijas; sin overflow a 360px en modo standalone
 - [ ] Prueba manual completa: offline → navegar catálogo, armar carrito, confirmar compra (queda pendiente) → volver online → pedido creado una sola vez, comisiones una sola vez
 
-## FASE 9 — Despliegue HTTPS y validación final (depende de U4)
+## FASE 10 — Despliegue HTTPS y validación final (depende de U4)
 
 > El SW funciona en `localhost`; en producción exige HTTPS.
 
@@ -200,12 +227,14 @@ trigger; máquina de estados de pedidos; `APIError{status,message,details}`.
 | 1 | Íconos generados | 🟡 Implementada (`tsc -b` y lint OK) — falta ejecutar `npm run test` |
 | 2 | SW `injectManifest` + manifest → instalable, interfaz offline | 🟡 Implementada (`tsc -b`, lint y build OK) — falta verificación en navegador |
 | 3 | Caché HTTP pública (catálogo, imágenes) | 🟡 Implementada (`tsc -b`, lint y build OK) — faltan `npm run test` y verificación en navegador |
-| 4 | IndexedDB (Dexie): catálogo local + borradores | ⬜ Pendiente |
+| 4 | IndexedDB (Dexie): catálogo local + borradores | 🟡 Implementada (`tsc -b`, lint y build OK) — faltan `npm run test` y verificación en navegador |
 | 5 | Backend: idempotencia, `version`, `expectedTotal`, `fromStatus` | ⬜ Pendiente |
 | 6 | Outbox + motor de sincronización + Background Sync | ⬜ Pendiente |
 | 7 | Resolución de conflictos + vista de pendientes | ⬜ Pendiente |
-| 8 | UX offline, actualizaciones, instalación | ⬜ Pendiente |
-| 9 | HTTPS y validación en dispositivos (U4) | ⬜ Pendiente |
+| 8 | Lectura offline de datos privados (instantáneas por usuario) + pendientes visibles en sus vistas | ⬜ Pendiente |
+| 9 | UX offline, actualizaciones, instalación | ⬜ Pendiente |
+| 10 | HTTPS y validación en dispositivos (U4) | ⬜ Pendiente |
 
 > Con 0–3 la app es **instalable y abre sin conexión**. Con 4–7 es **offline-first**:
-> consulta, captura y sincroniza sin duplicar pedidos. 8–9 la dejan lista para producción.
+> consulta, captura y sincroniza sin duplicar pedidos. Con 8 todas las vistas privadas
+> se consultan sin conexión. 9–10 la dejan lista para producción.

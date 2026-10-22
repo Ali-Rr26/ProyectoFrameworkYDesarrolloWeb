@@ -1,0 +1,63 @@
+// Base de datos local (IndexedDB con Dexie): lo que la app necesita sin conexión.
+// - products: copia del catálogo público (sin datos privados).
+// - meta:     marcas de sincronización (p. ej. catalogSyncedAt).
+// - drafts:   borradores de formularios, por usuario.
+// - outbox:   registros pendientes de enviar al servidor, por usuario (se usa en la Fase 6).
+//
+// Para cambiar el esquema se agrega un nuevo `this.version(n)` (nunca se edita uno publicado).
+import Dexie, { type EntityTable, type Table } from 'dexie';
+import type { Product } from '../data/products';
+
+// Producto del catálogo local: `position` conserva el orden en que lo entregó el servidor.
+export interface LocalProduct extends Product {
+  position: number;
+}
+
+export interface MetaEntry {
+  key: string;
+  value: string;
+}
+
+export interface DraftEntry {
+  userId: string;
+  formKey: string;
+  data: Record<string, unknown>;
+  updatedAt: string;
+}
+
+export type OutboxStatus = 'pending' | 'syncing' | 'done' | 'conflict' | 'failed';
+
+// Registro pendiente: su `id` viaja al backend como Idempotency-Key.
+export interface OutboxEntry {
+  id: string;
+  userId: string;
+  type: string;
+  method: 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  path: string;
+  payload: unknown;
+  baseVersion?: number;
+  status: OutboxStatus;
+  attempts: number;
+  lastError?: string;
+  nextAttemptAt?: string;
+  createdAt: string;
+}
+
+export class OfflineDB extends Dexie {
+  declare products: EntityTable<LocalProduct, 'id'>;
+  declare meta: EntityTable<MetaEntry, 'key'>;
+  declare drafts: Table<DraftEntry, [string, string]>;
+  declare outbox: EntityTable<OutboxEntry, 'id'>;
+
+  constructor(name = 'multicatalogo') {
+    super(name);
+    this.version(1).stores({
+      products: 'id, position',
+      meta: 'key',
+      drafts: '[userId+formKey], userId',
+      outbox: 'id, userId, status, createdAt, [userId+status]',
+    });
+  }
+}
+
+export const db = new OfflineDB();

@@ -7,7 +7,7 @@ import { clientsClaim } from 'workbox-core';
 import { ExpirationPlugin } from 'workbox-expiration';
 import { cleanupOutdatedCaches, createHandlerBoundToURL, precacheAndRoute } from 'workbox-precaching';
 import { NavigationRoute, registerRoute } from 'workbox-routing';
-import { CacheFirst, StaleWhileRevalidate } from 'workbox-strategies';
+import { CacheFirst, NetworkFirst } from 'workbox-strategies';
 import { API_URL } from './data/constants';
 import {
   CACHE_NAMES,
@@ -41,15 +41,21 @@ registerRoute(
   }),
 );
 
-// 3. Catálogo público (productos, detalle, categorías): responde al instante con la copia
-// guardada y la refresca en segundo plano. Solo se guardan respuestas 200.
+// 3. Catálogo público (productos, detalle, categorías): primero la red, para que el refresco
+// de la copia local (IndexedDB, src/offline) reciba datos vigentes; sin red o si tarda,
+// responde con la última copia guardada. Solo se guardan respuestas 200.
 registerRoute(
   ({ request, url }) => isPublicCatalogRequest(toCacheable(request, url), API_ORIGIN),
-  new StaleWhileRevalidate({
+  new NetworkFirst({
     cacheName: CACHE_NAMES.catalog,
+    networkTimeoutSeconds: CATALOG_CACHE.networkTimeoutSeconds,
     plugins: [
       new CacheableResponsePlugin({ statuses: [200] }),
-      new ExpirationPlugin({ ...CATALOG_CACHE, purgeOnQuotaError: true }),
+      new ExpirationPlugin({
+        maxEntries: CATALOG_CACHE.maxEntries,
+        maxAgeSeconds: CATALOG_CACHE.maxAgeSeconds,
+        purgeOnQuotaError: true,
+      }),
     ],
   }),
 );

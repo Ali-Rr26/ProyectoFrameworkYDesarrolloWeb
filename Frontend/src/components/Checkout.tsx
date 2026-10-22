@@ -1,26 +1,30 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/cart';
-import { createOrder, getPaymentMethods } from '../services/orderService';
+import { createOrder } from '../services/orderService';
 import { ApiError } from '../services/apiClient';
 import type { ConfirmedOrder } from './Confirmation';
 import { formatDateTime } from '../data/dates';
 import { BUSINESS_TIMEZONE } from '../data/constants';
+import { useDraft } from '../offline/useDraft';
+import { loadPaymentMethods } from '../offline/paymentMethods';
 
-interface ShippingData {
+// type (no interface): useDraft exige un objeto indexable por string.
+type ShippingData = {
   name: string;
   email: string;
   address: string;
   city: string;
   phone: string;
   paymentMethod: string;
-}
+};
 
 const Checkout = () => {
   const { cart, totalPrice, clearCart } = useCart();
   const navigate = useNavigate();
 
-  const [shipping, setShipping] = useState<ShippingData>({
+  // Datos de envío con borrador local: sobreviven a recargas, cierres y falta de conexión.
+  const [shipping, setShipping, clearDraft] = useDraft<ShippingData>("checkout", {
     name: "",
     email: "",
     address: "",
@@ -32,15 +36,16 @@ const Checkout = () => {
   const [processing, setProcessing] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
 
-  // Métodos de pago desde la BD (tabla payment_methods); se preselecciona el primero
+  // Métodos de pago desde la BD (tabla payment_methods), con la última lista guardada
+  // como respaldo sin conexión; se preselecciona el primero
   useEffect(() => {
-    getPaymentMethods()
+    loadPaymentMethods()
       .then((methods) => {
         setPaymentMethods(methods);
         setShipping((prev) => (prev.paymentMethod ? prev : { ...prev, paymentMethod: methods[0] ?? "" }));
       })
       .catch(() => setError("No se pudieron cargar los métodos de pago"));
-  }, []);
+  }, [setShipping]);
 
   // Si el carrito está vacío, mostramos un aviso en lugar del formulario
   if (cart.length === 0) {
@@ -87,7 +92,8 @@ const Checkout = () => {
         date: formatDateTime(created.created_at, BUSINESS_TIMEZONE),
       };
 
-      // Vaciamos el carrito y pasamos los datos del pedido a la confirmación
+      // Vaciamos el carrito y el borrador, y pasamos los datos del pedido a la confirmación
+      await clearDraft();
       clearCart();
       navigate("/confirmation", { state: { order } });
     } catch (err) {
