@@ -144,7 +144,8 @@ React SPA (:5173) ──► Caddy/Nginx (U4: proxy inverso + SSL)
 - [ ] Verificación en navegador: instalable y la interfaz abre offline (`npm run build && npm run preview`)
 
 ## PWA-F3 · Caché HTTP pública
-- [ ] Catálogo `StaleWhileRevalidate`, imágenes `CacheFirst` (60 entradas), nada con `Authorization` ni métodos de escritura en Cache Storage
+- [x] Catálogo `StaleWhileRevalidate`, imágenes `CacheFirst` (60 entradas), nada con `Authorization` ni métodos de escritura en Cache Storage — reglas puras en `src/pwa/cacheRules.ts`
+- [ ] Pruebas de `cacheRules` (`npm run test`) y verificación de Cache Storage en navegador
 
 ## PWA-F4 · Capa local IndexedDB (Dexie)
 - [ ] `OfflineDB` (`products`, `categories`, `meta`, `drafts`, `outbox`), catálogo local con `useLiveQuery`, `useDraft`, `storage.persist()`, limpieza por usuario al cerrar sesión

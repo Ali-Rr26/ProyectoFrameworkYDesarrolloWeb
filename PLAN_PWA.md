@@ -89,10 +89,14 @@
 
 > Reglas de `workbox-routing` por tipo de recurso. Solo respuestas públicas.
 
-- [ ] `GET {VITE_API_URL}/api/products*` y `/api/categories` → `StaleWhileRevalidate` (caché `api-catalog`, 1 día, `maxEntries` 50)
-- [ ] Imágenes (`request.destination === 'image'`) → `CacheFirst` (caché `images`, `maxEntries` 60, 30 días, `CacheableResponsePlugin({ statuses: [0, 200] })`)
-- [ ] Toda petición con cabecera `Authorization` o método distinto de `GET` → sin caché (`NetworkOnly` o sin ruta)
-- [ ] Verificación: DevTools → Cache Storage sin respuestas privadas
+- [x] `npm i -D workbox-strategies workbox-expiration workbox-cacheable-response` (7.4.1)
+- [x] Reglas puras en `src/pwa/cacheRules.ts` (`isPublicCatalogRequest`, `isImageRequest`, `CACHE_NAMES`, límites) — el SW solo las conecta; origen de la API tomado de `API_URL` (`VITE_API_URL`)
+- [x] `GET {VITE_API_URL}/api/products`, `/api/products/:id` y `/api/categories` → `StaleWhileRevalidate` (caché `api-catalog`, solo `200`, 1 día, `maxEntries` 50, `purgeOnQuotaError`); `/api/admin/products` excluida
+- [x] Imágenes (`request.destination === 'image'`) → `CacheFirst` (caché `images`, `maxEntries` 60, 30 días, `CacheableResponsePlugin({ statuses: [0, 200] })`, `purgeOnQuotaError`)
+- [x] Toda petición con cabecera `Authorization` o método distinto de `GET` → sin ruta registrada: el SW no la intercepta y va directo a la red
+- [x] `tsconfig.sw.json` incluye `src/vite-env.d.ts` (tipos de `import.meta.env` para `API_URL`)
+- [x] Pruebas `src/pwa/cacheRules.test.ts` (rutas públicas, privadas, métodos de escritura, `Authorization`, otro origen, imágenes) — falta ejecutar `npm run test`
+- [x] Verificación en navegador: con sesión iniciada, recorrer catálogo y vistas privadas → DevTools → Cache Storage solo muestra `api-catalog` (productos/categorías) e `images`; ninguna respuesta de `/api/me`, `/api/orders*`, `/api/network`, etc. Luego Network "Offline" → `/store` y `/catalog` muestran los productos guardados
 
 ## FASE 4 — Capa local de datos (IndexedDB con Dexie)
 
@@ -195,7 +199,7 @@ trigger; máquina de estados de pedidos; `APIError{status,message,details}`.
 | 0 | Metadatos, identidad PWA, Vitest | 🟡 Implementada (`tsc -b` y lint OK) — falta ejecutar `npm run test` |
 | 1 | Íconos generados | 🟡 Implementada (`tsc -b` y lint OK) — falta ejecutar `npm run test` |
 | 2 | SW `injectManifest` + manifest → instalable, interfaz offline | 🟡 Implementada (`tsc -b`, lint y build OK) — falta verificación en navegador |
-| 3 | Caché HTTP pública (catálogo, imágenes) | ⬜ Pendiente |
+| 3 | Caché HTTP pública (catálogo, imágenes) | 🟡 Implementada (`tsc -b`, lint y build OK) — faltan `npm run test` y verificación en navegador |
 | 4 | IndexedDB (Dexie): catálogo local + borradores | ⬜ Pendiente |
 | 5 | Backend: idempotencia, `version`, `expectedTotal`, `fromStatus` | ⬜ Pendiente |
 | 6 | Outbox + motor de sincronización + Background Sync | ⬜ Pendiente |
