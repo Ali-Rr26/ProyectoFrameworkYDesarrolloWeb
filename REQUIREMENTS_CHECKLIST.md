@@ -123,3 +123,42 @@ React SPA (:5173) ──► Caddy/Nginx (U4: proxy inverso + SSL)
 - [x] Errores sanitizados: `Details` solo con `APP_ENV=dev`; `ErrInvalidQuantity` propio (400 "cantidad debe ser mayor que cero", distinto de stock)
 
 ---
+
+# PWA — MultiCatálogo offline-first
+
+> Plan detallado, decisiones (D1–D12) y verificación por ítem en **`PLAN_PWA.md`**.
+> Resumen: `vite-plugin-pwa` en modo `injectManifest` (SW propio con Workbox),
+> IndexedDB con Dexie, outbox con `Idempotency-Key` y motor de sincronización en la
+> página (Background Sync solo como acelerador), conflictos resueltos por tipo de
+> operación con el servidor como autoridad.
+
+## PWA-F0 · Preparación y metadatos
+- [x] `index.html` (`lang="es"`, título, `description`, `theme-color`), identidad PWA (`PWA_IDENTITY`), limpieza del scaffold
+- [ ] Vitest + `fake-indexeddb` configurado — falta ejecutar `npm run test`
+
+## PWA-F1 · Íconos
+- [ ] `@vite-pwa/assets-generator` (`npm run icons`): 192, 512, maskable, `apple-touch-icon`, `favicon.ico`
+
+## PWA-F2 · Service worker propio y manifest (instalable)
+- [ ] `injectManifest` con `src/sw.ts` (`precacheAndRoute`, `NavigationRoute`, `SKIP_WAITING`) + manifest `standalone`; interfaz abre offline
+
+## PWA-F3 · Caché HTTP pública
+- [ ] Catálogo `StaleWhileRevalidate`, imágenes `CacheFirst` (60 entradas), nada con `Authorization` ni métodos de escritura en Cache Storage
+
+## PWA-F4 · Capa local IndexedDB (Dexie)
+- [ ] `OfflineDB` (`products`, `categories`, `meta`, `drafts`, `outbox`), catálogo local con `useLiveQuery`, `useDraft`, `storage.persist()`, limpieza por usuario al cerrar sesión
+
+## PWA-F5 · Backend preparado para sincronizar
+- [ ] Migración `0006_sync.sql` (`products.version`/`updated_at`, `idempotency_keys`), middleware `Idempotency`, `409` por `version`, `expectedTotal` y `fromStatus`, pruebas Go
+
+## PWA-F6 · Outbox y motor de sincronización
+- [ ] `enqueue` con UUID, estados `pending/syncing/done/conflict/failed`, FIFO por usuario, `navigator.locks`, backoff, pausa en `401`, disparo por `online`/arranque/login/Background Sync
+
+## PWA-F7 · Resolución de conflictos
+- [ ] Checkout re-confirmado con stock/precio del servidor, comparación campo a campo en productos, estado de pedido validado, vista `/pending`
+
+## PWA-F8 · Experiencia offline, actualizaciones e instalación
+- [ ] `useOnlineStatus` + banner, `NetworkError` en `apiClient`, vistas "Requiere conexión", `ReloadPrompt`, `useInstallPrompt`, `safe-area-inset`, prueba offline → online sin pedidos duplicados
+
+## PWA-F9 · HTTPS y validación final (depende de U4)
+- [ ] HTTPS mismo dominio, cabeceras de caché, imágenes con CORS, Lighthouse ≥ 90, pruebas en Android/escritorio/iOS, `PROJECT_MAP.md`
