@@ -140,7 +140,8 @@ React SPA (:5173) ──► Caddy/Nginx (U4: proxy inverso + SSL)
 - [x] `@vite-pwa/assets-generator` (`npm run icons`) desde logo propio `favicon.svg`: 64, 192, 512, maskable, `apple-touch-icon`, `favicon.ico` + enlaces en `index.html`
 
 ## PWA-F2 · Service worker propio y manifest (instalable)
-- [ ] `injectManifest` con `src/sw.ts` (`precacheAndRoute`, `NavigationRoute`, `SKIP_WAITING`) + manifest `standalone`; interfaz abre offline
+- [x] `injectManifest` con `src/sw.ts` (`precacheAndRoute`, `NavigationRoute`, `SKIP_WAITING`, `clientsClaim`) + manifest `standalone` desde `PWA_IDENTITY` + `tsconfig.sw.json`; build genera `sw.js` y `manifest.webmanifest`
+- [ ] Verificación en navegador: instalable y la interfaz abre offline (`npm run build && npm run preview`)
 
 ## PWA-F3 · Caché HTTP pública
 - [ ] Catálogo `StaleWhileRevalidate`, imágenes `CacheFirst` (60 entradas), nada con `Authorization` ni métodos de escritura en Cache Storage

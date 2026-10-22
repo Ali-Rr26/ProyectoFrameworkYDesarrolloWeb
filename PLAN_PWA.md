@@ -68,20 +68,22 @@
 - [x] Logo propio en `public/favicon.svg` (reemplaza el logo de Vite): "M" blanca con nodos de red sobre turquesa de marca
 - [x] `pwa-64x64.png`, `pwa-192x192.png`, `pwa-512x512.png`, `maskable-icon-512x512.png` (margen 30 %, fondo de marca), `apple-touch-icon-180x180.png` (fondo de marca), `favicon.ico` 48 — revisados visualmente
 - [x] `index.html`: `favicon.ico` de respaldo, `favicon.svg` (`sizes="any"`) y `<link rel="apple-touch-icon">`
-- [ ] Prueba de los enlaces en `pwa.test.ts` — falta ejecutar `npm run test`
+- [x] Prueba de los enlaces en `pwa.test.ts` — falta ejecutar `npm run test`
 
 ## FASE 2 — Service worker propio y manifest (instalable)
 
 > `vite-plugin-pwa` en modo `injectManifest`: el plugin inyecta la lista de precache
 > (`self.__WB_MANIFEST`) en nuestro `src/sw.ts`.
 
-- [ ] `npm i -D vite-plugin-pwa workbox-precaching workbox-routing workbox-strategies workbox-expiration workbox-cacheable-response workbox-background-sync`
-- [ ] `vite.config.ts`: `VitePWA({ strategies: 'injectManifest', srcDir: 'src', filename: 'sw.ts', registerType: 'prompt', manifest: {...}, injectManifest: { globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'] } })`
-- [ ] Manifest: `start_url: '/'`, `scope: '/'`, `display: 'standalone'`, `orientation: 'portrait'`, `lang: 'es'`, íconos de la Fase 1
-- [ ] `src/sw.ts`: `precacheAndRoute(self.__WB_MANIFEST)`, `cleanupOutdatedCaches()`, `NavigationRoute` a `index.html` con denylist `/^\/api\//`
-- [ ] `src/sw.ts`: escucha `message` `SKIP_WAITING` (para el aviso de actualización de la Fase 8)
-- [ ] `tsconfig` del SW con `lib: ["WebWorker"]`; tipos `vite-plugin-pwa/client` en `vite-env.d.ts`
-- [ ] Verificación: `npm run build && npm run preview` → manifest válido, SW activo, Chrome ofrece "Instalar"; con Network "Offline" la interfaz abre en cualquier ruta
+- [x] `npm i -D vite-plugin-pwa@2.0.0 workbox-core workbox-precaching workbox-routing` (7.4.1) — `workbox-strategies`, `-expiration`, `-cacheable-response` se instalan en la Fase 3 y `workbox-background-sync` en la Fase 6, cuando se usen
+- [x] `vite.config.ts`: `VitePWA({ strategies: 'injectManifest', srcDir: 'src', filename: 'sw.ts', registerType: 'prompt', injectRegister: 'auto', includeManifestIcons: false, injectManifest: { globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'] } })` — registro por `registerSW.js` hasta que la Fase 8 use `virtual:pwa-register/react`
+- [x] Manifest desde `PWA_IDENTITY`: `id`/`start_url`/`scope` `'/'`, `display: 'standalone'`, `orientation: 'portrait'`, `lang: 'es'`, `categories`, íconos de la Fase 1 (maskable incluido)
+- [x] `src/sw.ts`: `precacheAndRoute(self.__WB_MANIFEST)`, `cleanupOutdatedCaches()`, `NavigationRoute` a `index.html` con denylist `/^\/api\//`, `clientsClaim()`
+- [x] `src/sw.ts`: escucha `message` `SKIP_WAITING` (para el aviso de actualización de la Fase 8)
+- [x] `tsconfig.sw.json` (`lib: ["ES2023", "WebWorker"]`, referenciado en `tsconfig.json`; `src/sw.ts` excluido de `tsconfig.app.json`); tipos `vite-plugin-pwa/client` en `vite-env.d.ts`
+- [x] Build: `dist/manifest.webmanifest`, `dist/sw.js` (12 entradas de precache, sin duplicados), `<link rel="manifest">` y `registerSW.js` inyectados en `index.html`
+- [x] `CORS_ORIGIN` del backend admite también `http://localhost:4173` (`vite preview`, donde corre el SW) — lista separada por comas en `.env`/`.env.example`. Se descartó mover `preview` al 5175: el SW registrado ahí interceptaría luego el `npm run dev` con el build viejo
+- [x] Verificación en navegador: `npm run build && npm run preview` → DevTools → Application: manifest sin errores, SW activo, Chrome ofrece "Instalar"; Network "Offline" + recarga en `/store`, `/catalog`, `/product/1` → la interfaz abre
 
 ## FASE 3 — Caché HTTP en el service worker
 
@@ -192,7 +194,7 @@ trigger; máquina de estados de pedidos; `APIError{status,message,details}`.
 |---|---|---|
 | 0 | Metadatos, identidad PWA, Vitest | 🟡 Implementada (`tsc -b` y lint OK) — falta ejecutar `npm run test` |
 | 1 | Íconos generados | 🟡 Implementada (`tsc -b` y lint OK) — falta ejecutar `npm run test` |
-| 2 | SW `injectManifest` + manifest → instalable, interfaz offline | ⬜ Pendiente |
+| 2 | SW `injectManifest` + manifest → instalable, interfaz offline | 🟡 Implementada (`tsc -b`, lint y build OK) — falta verificación en navegador |
 | 3 | Caché HTTP pública (catálogo, imágenes) | ⬜ Pendiente |
 | 4 | IndexedDB (Dexie): catálogo local + borradores | ⬜ Pendiente |
 | 5 | Backend: idempotencia, `version`, `expectedTotal`, `fromStatus` | ⬜ Pendiente |

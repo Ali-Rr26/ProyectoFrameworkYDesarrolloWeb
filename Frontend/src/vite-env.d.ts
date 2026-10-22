@@ -1,4 +1,5 @@
 /// <reference types="vite/client" />
+/// <reference types="vite-plugin-pwa/client" />
 
 // Variables de entorno expuestas al cliente (solo las que empiezan con VITE_).
 interface ImportMetaEnv {
