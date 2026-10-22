@@ -22,7 +22,7 @@ type Config struct {
 	// AppEnv es el entorno de ejecución: "dev" expone el detalle técnico de los errores
 	// (APIError.Details); cualquier otro valor (por defecto "production") lo oculta.
 	AppEnv string
-	// CORSOrigin es el origen permitido para el frontend.
+	// CORSOrigin son los orígenes permitidos para el frontend (lista separada por comas).
 	CORSOrigin string
 	// NetworkRootEmail es la raíz por defecto de GET /api/network cuando consulta un admin.
 	NetworkRootEmail string
