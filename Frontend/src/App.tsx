@@ -18,6 +18,7 @@ import AdminPayouts from './components/AdminPayouts';
 import MyOrders from './components/MyOrders';
 import { CartProvider } from './context/CartContext';
 import { AuthProvider } from './context/AuthContext';
+import { OutboxProvider } from './offline/OutboxProvider';
 import { useAuth } from './context/auth';
 
 // Componente para proteger las rutas privadas: exige estar autenticado
@@ -63,6 +64,7 @@ const CartBoundary = ({ children }: { children: ReactNode }) => {
 function App() {
   return (
     <AuthProvider> {/* Proveedor de Autenticación */}
+      <OutboxProvider> {/* Pendientes guardados sin conexión y su sincronización */}
       <CartBoundary> {/* Proveedor del Carrito (uno por usuario) */}
         <BrowserRouter>
           <Routes>
@@ -99,6 +101,7 @@ function App() {
           </Routes>
         </BrowserRouter>
       </CartBoundary>
+      </OutboxProvider>
     </AuthProvider>
   );
 }

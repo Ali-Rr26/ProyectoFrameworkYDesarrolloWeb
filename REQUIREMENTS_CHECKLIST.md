@@ -157,7 +157,8 @@ React SPA (:5173) ──► Caddy/Nginx (U4: proxy inverso + SSL)
 - [ ] Pruebas Go (`go test ./...`)
 
 ## PWA-F6 · Outbox y motor de sincronización
-- [ ] `NetworkError` en `apiClient`, `enqueue` con UUID, estados `pending/syncing/done/conflict/failed`, FIFO por usuario, `navigator.locks`, backoff, pausa en `401`, disparo por `online`/arranque/login/Background Sync, botón "Sincronizar ahora" en `Navbar`, `Checkout` sin red → "Guardar pedido"
+- [x] `NetworkError` en `apiClient`, `enqueue`/`sendOrQueue` con UUID como `Idempotency-Key`, estados `pending/syncing/done/conflict/failed`, FIFO por usuario, `navigator.locks`, backoff con jitter, pausa en `401`, disparo por arranque/login/`online`/Background Sync, botón "Sincronizar" en `Navbar`, `Checkout` sin red → "Guardar pedido", altas/ediciones de producto y cambios de estado encolables
+- [ ] Pruebas (`npm run test`) y verificación offline → online en navegador
 
 ## PWA-F7 · Resolución de conflictos
 - [ ] Checkout re-confirmado con stock/precio del servidor, comparación campo a campo en productos, estado de pedido validado, vista `/pending`

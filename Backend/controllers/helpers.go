@@ -118,7 +118,9 @@ func repoError(c *fiber.Ctx, err error) error {
 		return apiError(c, fiber.StatusConflict, "El pedido cambió de estado mientras tanto",
 			map[string]string{"status": statusChanged.Current})
 	case errors.Is(err, repository.ErrIdempotencyInProgress):
-		return apiError(c, fiber.StatusConflict, "Esta operación ya se está procesando; reintenta en unos segundos", nil)
+		// retryable distingue este 409 (reintentar más tarde) de los conflictos de datos.
+		return apiError(c, fiber.StatusConflict, "Esta operación ya se está procesando; reintenta en unos segundos",
+			map[string]bool{"retryable": true})
 	}
 
 	switch {

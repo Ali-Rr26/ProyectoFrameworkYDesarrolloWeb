@@ -1,13 +1,17 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/cart';
-import { createOrder } from '../services/orderService';
+import { createOrder, type CreateOrderPayload } from '../services/orderService';
 import { ApiError } from '../services/apiClient';
-import type { ConfirmedOrder } from './Confirmation';
+import type { ConfirmedOrder, QueuedOrder } from './Confirmation';
 import { formatDateTime } from '../data/dates';
 import { BUSINESS_TIMEZONE } from '../data/constants';
 import { useDraft } from '../offline/useDraft';
 import { loadPaymentMethods } from '../offline/paymentMethods';
+import { useAuth } from '../context/auth';
+import { draftOwner } from '../offline/drafts';
+import { isOffline, sendOrQueue } from '../offline/outbox';
+import { useOutbox } from '../offline/outboxContext';
 
 // type (no interface): useDraft exige un objeto indexable por string.
 type ShippingData = {
@@ -21,6 +25,9 @@ type ShippingData = {
 
 const Checkout = () => {
   const { cart, totalPrice, clearCart } = useCart();
+  const { user } = useAuth();
+  // Sin conexión el pedido se guarda en el outbox y se envía al volver la red.
+  const { online } = useOutbox();
   const navigate = useNavigate();
 
   // Datos de envío con borrador local: sobreviven a recargas, cierres y falta de conexión.
@@ -68,16 +75,50 @@ const Checkout = () => {
     setProcessing(true);
     setError("");
 
+    // El backend registra el pedido en una transacción: descuenta stock y usa
+    // los precios de la BD. El comprador se toma del JWT, no del formulario.
+    const order: CreateOrderPayload = {
+      payment_method: shipping.paymentMethod,
+      shipping_address: shipping.address,
+      city: shipping.city,
+      phone: shipping.phone,
+      items: cart.map((item) => ({ product_id: item.id, quantity: item.quantity })),
+    };
+    // Guardado sin conexión: viaja el total que el cliente aceptó. Si al sincronizar los
+    // precios cambiaron, el servidor responde 409 en lugar de cobrar otro monto (Fase 7).
+    // Con red se envía sin él (el total del servidor se muestra en la confirmación).
+    const payload: CreateOrderPayload = isOffline()
+      ? { ...order, expected_total: Math.round(totalPrice * 100) / 100 }
+      : order;
+    const units = cart.reduce((sum, item) => sum + item.quantity, 0);
+
     try {
-      // El backend registra el pedido en una transacción: descuenta stock y usa
-      // los precios de la BD. El comprador se toma del JWT, no del formulario.
-      const created = await createOrder({
-        payment_method: shipping.paymentMethod,
-        shipping_address: shipping.address,
-        city: shipping.city,
-        phone: shipping.phone,
-        items: cart.map((item) => ({ product_id: item.id, quantity: item.quantity })),
-      });
+      // Con red se envía con Idempotency-Key (un doble clic o un reintento no duplica el
+      // pedido); sin red, o si la red cae a mitad del envío, queda en el outbox.
+      const outcome = await sendOrQueue(
+        {
+          userId: draftOwner(user?.email),
+          type: 'checkout',
+          method: 'POST',
+          path: '/api/checkout',
+          payload,
+          label: `Pedido de ${units} ${units === 1 ? 'producto' : 'productos'} ($${totalPrice.toFixed(2)})`,
+        },
+        (key) => createOrder(payload, key),
+      );
+
+      if (outcome.status === 'queued') {
+        const queued: QueuedOrder = {
+          items: cart.map((item) => ({ name: item.name, quantity: item.quantity, price: item.price })),
+          total: totalPrice,
+          customer: { name: shipping.name, email: shipping.email, city: shipping.city },
+        };
+        await clearDraft();
+        clearCart();
+        navigate("/confirmation", { state: { queued } });
+        return;
+      }
+      const created = outcome.result;
 
       // Los datos de la confirmación salen de la respuesta del servidor (no del carrito local)
       const order: ConfirmedOrder = {
@@ -215,8 +256,13 @@ const Checkout = () => {
             disabled={processing || !shipping.paymentMethod}
             className="w-full bg-[#20b2aa] text-white py-3 rounded-lg font-semibold hover:bg-[#008080] transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {processing ? "Procesando pago..." : "Confirmar Pedido"}
+            {processing ? "Procesando pago..." : online ? "Confirmar Pedido" : "Guardar pedido"}
           </button>
+          {!online && (
+            <p className="text-sm text-amber-700 text-center">
+              Sin conexión: el pedido se guardará en este dispositivo y se enviará automáticamente al volver la conexión.
+            </p>
+          )}
         </form>
 
         {/* ===== RESUMEN DEL PEDIDO ===== */}

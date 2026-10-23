@@ -178,7 +178,7 @@ func TestSyncConflictsAreMappedTo409WithDetails(t *testing.T) {
 		{"versión de producto", `"version":5`, &repository.VersionConflictError{Current: &models.Product{ID: 1, Version: 5}}},
 		{"precio cambiado", `"total":12.5`, &repository.PriceChangedError{Expected: 10, Total: 12.5}},
 		{"estado cambiado", `"status":"shipped"`, &repository.StatusChangedError{Current: models.OrderShipped}},
-		{"clave en curso", `"status":409`, &repository.DomainError{Kind: repository.ErrIdempotencyInProgress, Detail: testKey, Public: true}},
+		{"clave en curso", `"retryable":true`, &repository.DomainError{Kind: repository.ErrIdempotencyInProgress, Detail: testKey, Public: true}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

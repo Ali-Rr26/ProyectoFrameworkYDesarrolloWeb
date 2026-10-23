@@ -27,19 +27,30 @@ export interface DraftEntry {
 
 export type OutboxStatus = 'pending' | 'syncing' | 'done' | 'conflict' | 'failed';
 
+// Operaciones que se pueden guardar sin conexión (D8).
+export type OutboxType = 'checkout' | 'product:create' | 'product:update' | 'order:status';
+
 // Registro pendiente: su `id` viaja al backend como Idempotency-Key.
+// Los campos sin índice (label, result, details...) no requieren cambiar el esquema.
 export interface OutboxEntry {
   id: string;
   userId: string;
-  type: string;
+  type: OutboxType;
   method: 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   path: string;
   payload: unknown;
   baseVersion?: number;
+  // Texto para el usuario: "Pedido de 3 productos ($45.00)".
+  label: string;
   status: OutboxStatus;
   attempts: number;
   lastError?: string;
+  // Detalle del 409/422 del servidor (producto vigente, total vigente...) para la Fase 7.
+  details?: unknown;
   nextAttemptAt?: string;
+  // Respuesta del servidor al enviarse (p. ej. el pedido creado con su número).
+  result?: unknown;
+  completedAt?: string;
   createdAt: string;
 }
 

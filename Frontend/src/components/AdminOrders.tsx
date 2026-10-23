@@ -9,8 +9,11 @@ import {
   type OrderSummary,
   type Page,
 } from '../data/orders';
+import { useAuth } from '../context/auth';
+import { draftOwner } from '../offline/drafts';
+import { sendOrQueue } from '../offline/outbox';
 import { ApiError } from '../services/apiClient';
-import { getOrders, updateOrderStatus } from '../services/orderService';
+import { getOrders, updateOrderStatus, type OrderStatusPayload } from '../services/orderService';
 import OrderCard from './OrderCard';
 import Pagination from './Pagination';
 
@@ -22,6 +25,9 @@ const AdminOrders = () => {
   const [page, setPage] = useState<number>(1);
   const [result, setResult] = useState<Page<OrderSummary> | null>(null);
   const [error, setError] = useState<string>('');
+  // Aviso de un cambio guardado sin conexión (se enviará al volver la red)
+  const [notice, setNotice] = useState<string>('');
+  const { user } = useAuth();
   // ID del pedido que se está actualizando
   const [savingId, setSavingId] = useState<number | null>(null);
 
@@ -40,8 +46,26 @@ const AdminOrders = () => {
     if (!window.confirm(`¿${STATUS_ACTIONS[next]} ${orderNumber(order.id)}?${warning}`)) return;
     setSavingId(order.id);
     setError('');
+    setNotice('');
+    // from_status: si otro admin cambió el pedido mientras tanto, el servidor responde 409.
+    const change: OrderStatusPayload = { status: next, from_status: order.status };
     try {
-      const updated = await updateOrderStatus(order.id, next);
+      const outcome = await sendOrQueue(
+        {
+          userId: draftOwner(user?.email),
+          type: 'order:status',
+          method: 'PATCH',
+          path: `/api/orders/${order.id}/status`,
+          payload: change,
+          label: `${STATUS_ACTIONS[next]} ${orderNumber(order.id)}`,
+        },
+        (key) => updateOrderStatus(order.id, change, key),
+      );
+      if (outcome.status === 'queued') {
+        setNotice(`Sin conexión: "${STATUS_ACTIONS[next]} ${orderNumber(order.id)}" se guardó y se enviará al volver la conexión.`);
+        return;
+      }
+      const updated = outcome.result;
       setResult((prev) => prev && {
         ...prev,
         data: prev.data.map((o) => (o.id === updated.id ? { ...o, status: updated.status } : o)),
@@ -75,6 +99,7 @@ const AdminOrders = () => {
       </div>
 
       {error && <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm mb-6 border border-red-200">{error}</div>}
+      {notice && <div className="bg-amber-50 text-amber-800 p-3 rounded-lg text-sm mb-6 border border-amber-200">{notice}</div>}
       {!result && !error && <p className="text-slate-500">Cargando pedidos...</p>}
       {result && result.data.length === 0 && <p className="text-slate-500">No hay pedidos con ese estado.</p>}
 

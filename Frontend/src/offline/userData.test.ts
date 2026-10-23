@@ -8,6 +8,7 @@ const entry = (userId: string, status: OutboxStatus): OutboxEntry => ({
   userId,
   type: 'checkout',
   method: 'POST',
+  label: 'Pedido de prueba',
   path: '/api/checkout',
   payload: {},
   status,

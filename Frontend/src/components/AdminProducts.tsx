@@ -2,7 +2,10 @@
 import { useEffect, useState } from 'react';
 import type { Page } from '../data/orders';
 import type { Product, ProductInput } from '../data/products';
+import { useAuth } from '../context/auth';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
+import { draftOwner } from '../offline/drafts';
+import { sendOrQueue } from '../offline/outbox';
 import { ApiError } from '../services/apiClient';
 import {
   createProduct,
@@ -36,6 +39,9 @@ const AdminProducts = () => {
   const [failure, setFailure] = useState<{ key: string; message: string } | null>(null);
   const [categories, setCategories] = useState<string[]>([]);
   const [error, setError] = useState<string>('');
+  // Aviso de un alta/edición guardada sin conexión (se enviará al volver la red)
+  const [notice, setNotice] = useState<string>('');
+  const { user } = useAuth();
   const [form, setForm] = useState<FormState>({ mode: 'closed' });
   const [fieldErrors, setFieldErrors] = useState<ProductFieldErrors>({});
   const [saving, setSaving] = useState<boolean>(false);
@@ -82,21 +88,39 @@ const AdminProducts = () => {
     setSaving(true);
     setError('');
     setFieldErrors({});
+    setNotice('');
+    const userId = draftOwner(user?.email);
     try {
       if (form.mode === 'edit') {
         // Con la versión editada: si otro admin (o una venta) cambió el producto, 409.
-        replace(await updateProduct(form.product.id, { ...input, version: form.product.version }));
+        const product = form.product;
+        const changes = { ...input, version: product.version };
+        const outcome = await sendOrQueue(
+          { userId, type: 'product:update', method: 'PUT', path: `/api/products/${product.id}`,
+            payload: changes, baseVersion: product.version, label: `Editar "${input.name}"` },
+          (key) => updateProduct(product.id, changes, key),
+        );
+        if (outcome.status === 'sent') replace(outcome.result);
+        else setNotice(`Sin conexión: la edición de "${input.name}" se guardó y se enviará al volver la conexión.`);
       } else {
+        const outcome = await sendOrQueue(
+          { userId, type: 'product:create', method: 'POST', path: '/api/products',
+            payload: input, label: `Crear "${input.name}"` },
+          (key) => createProduct(input, key),
+        );
         // El nuevo producto puede caer en otra página o fuera de la búsqueda: se recarga.
-        await createProduct(input);
-        setVersion((v) => v + 1);
+        if (outcome.status === 'sent') setVersion((v) => v + 1);
+        else setNotice(`Sin conexión: el alta de "${input.name}" se guardó y se enviará al volver la conexión.`);
       }
       setForm({ mode: 'closed' });
       return true;
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message);
-        if (err.details && typeof err.details === 'object') setFieldErrors(err.details as ProductFieldErrors);
+        // Solo los 400 traen errores por campo (un 409 trae el producto vigente).
+        if (err.status === 400 && err.details && typeof err.details === 'object') {
+          setFieldErrors(err.details as ProductFieldErrors);
+        }
       } else {
         setError('No se pudo guardar el producto');
       }
@@ -138,6 +162,9 @@ const AdminProducts = () => {
 
       {(error || loadError) && (
         <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm mb-6 border border-red-200">{error || loadError}</div>
+      )}
+      {notice && (
+        <div className="bg-amber-50 text-amber-800 p-3 rounded-lg text-sm mb-6 border border-amber-200">{notice}</div>
       )}
 
       {form.mode !== 'closed' && (

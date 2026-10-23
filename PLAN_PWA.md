@@ -151,23 +151,25 @@ trigger; máquina de estados de pedidos; `APIError{status,message,details}`.
 
 > Las escrituras offline se guardan como registros pendientes y se envían en orden.
 
-- [ ] `apiClient.ts`: distinguir fallo de red (`TypeError` de `fetch`) de `ApiError` con un `NetworkError` propio — lo usan el outbox (decide encolar) y las instantáneas de la Fase 8 (movido desde la antigua Fase 8)
-- [ ] `src/offline/outbox.ts`: `enqueue({ type, method, path, payload, baseVersion })` genera el UUID (`crypto.randomUUID()`) que viaja como `Idempotency-Key`
-- [ ] Estados del registro: `pending → syncing → done | conflict | failed`; `attempts`, `lastError`, `nextAttemptAt`
-- [ ] `src/offline/syncEngine.ts` (corre en la página, usa `apiFetch` con el JWT actual):
-  - FIFO por usuario, de uno en uno (un alta de producto va antes que su edición)
-  - solo envía registros del usuario con sesión activa
-  - lock entre pestañas con `navigator.locks.request('outbox-sync', ...)`
-- [ ] Clasificador puro de respuestas (`classifySyncResult`):
-  - red caída o `5xx` → reintento con backoff exponencial + jitter (máx. 1 h)
-  - `401` → pausa hasta nuevo login ("Inicia sesión para enviar N pendientes")
-  - `409` → `conflict` (Fase 7)
-  - `400`/`403`/`422` → `failed` (requiere corrección del usuario)
-- [ ] Disparadores: arranque de la app, evento `online`, tras login, botón **"Sincronizar ahora"** en `Navbar` (visible con pendientes, con contador; deshabilitado sin red)
-- [ ] SW: al encolar, la página registra `sync` (`registration.sync.register('outbox')`) si existe; en el evento `sync` el SW avisa a las pestañas abiertas (`clients.matchAll` + `postMessage`) para que ejecuten el motor
-- [ ] Componentes con escritura offline usan `enqueue` cuando no hay red: `Checkout`, `ProductForm`, cambio de estado en `AdminOrders`; con red siguen enviando directo (con `Idempotency-Key` igualmente)
-- [ ] `Checkout` sin red: el botón pasa a **"Guardar pedido"**; al pulsarlo el pedido queda en el outbox, se vacía el carrito y se muestra "Pedido guardado: se enviará al volver la conexión" (la confirmación con número `MC-…` llega tras sincronizar)
-- [ ] Pruebas Vitest: orden FIFO, backoff, clasificador, pausa por `401`, no envío entre usuarios
+- [x] `apiClient.ts`: `NetworkError` propio cuando `fetch` no obtiene respuesta (distinto de `ApiError`), opción `headers` en `apiFetch` e `idempotencyHeaders(key)`; `createOrder`, `createProduct`, `updateProduct` y `updateOrderStatus` aceptan la `Idempotency-Key` (y `updateOrderStatus` el `from_status`)
+- [x] `src/offline/outbox.ts`: `enqueue({ type, method, path, payload, baseVersion, label })` con `crypto.randomUUID()` como id = `Idempotency-Key`; `sendOrQueue(input, send)`: sin red guarda; con red envía con clave y, si la red cae a mitad del envío (`NetworkError`), guarda el registro **con la misma clave** (reenviarlo es seguro); los `ApiError` se propagan para resolverse en el momento
+- [x] Estados del registro: `pending → syncing → done | conflict | failed`; `attempts`, `lastError`, `details` (detalle del 409/422 para la Fase 7), `nextAttemptAt`, `result` (respuesta del servidor), `completedAt`. Campos sin índice: sin cambio de esquema
+- [x] `src/offline/syncEngine.ts` (`runSync` / `syncOutbox`, corre en la página con el JWT actual):
+  - FIFO por usuario, de uno en uno; un fallo transitorio detiene la cola (respeta el orden); un conflicto o un error de datos marca ese registro y sigue con el siguiente
+  - solo envía registros del usuario con sesión activa; un registro que quedó en `syncing` se reenvía (idempotente)
+  - lock entre pestañas con `navigator.locks.request('outbox-sync', { ifAvailable: true })` y promesa compartida en la pestaña
+  - los `done` se conservan 24 h (avisos) y luego se borran
+- [x] Clasificador puro `classifySyncError` (`src/offline/syncPolicy.ts`):
+  - `NetworkError`, `5xx`, `408`, `429` y el `409` con `details.retryable` (misma clave en curso; ajuste del backend) → reintento con backoff exponencial desde 5 s, jitter 50–100 % y tope de 1 h
+  - `401` → pausa sin contar el intento ("Inicia sesión para enviar los pendientes")
+  - `409` de datos (stock, precio, versión, estado) → `conflict` (Fase 7)
+  - `400`/`403`/`404`/`422` → `failed` (requiere corrección del usuario)
+- [x] Disparadores (`OutboxProvider`, `src/offline/OutboxProvider.tsx`): arranque de la app, inicio de sesión, evento `online`, nuevo pendiente (`outbox:changed`), mensaje del SW, reintento programado y botón **"Sincronizar"** (`SyncIndicator` en `Navbar`: contador de pendientes, deshabilitado sin red o mientras envía; aviso "N por revisar" para `conflict`/`failed`; confirmación breve "Pedido MC-… enviado")
+- [x] SW: al encolar se registra `sync` (`registration.sync.register('outbox')`) si existe; en el evento `sync` el SW avisa a las pestañas abiertas (`clients.matchAll` + `postMessage SYNC_OUTBOX`). Constantes compartidas en `src/offline/syncMessages.ts` (sin dependencias: el SW no carga Dexie). No hizo falta `workbox-background-sync`: el SW no guarda peticiones, solo avisa
+- [x] Escrituras con `sendOrQueue`: `Checkout` (pedido), `AdminProducts` (alta y edición con `version`) y `AdminOrders` (cambio de estado con `from_status`); con red se envían directo y con `Idempotency-Key`. Avisos "Sin conexión: … se guardó y se enviará al volver la conexión". `AdminProducts` ya no muestra el producto de un `409` como errores por campo (solo los `400` traen errores por campo)
+- [x] `Checkout` sin red: botón **"Guardar pedido"** + aviso; el pedido viaja con `expected_total` (total que aceptó el cliente); se vacían carrito y borrador y `/confirmation` muestra "Pedido guardado" (sin número: se asigna al enviarse). Con red se envía sin `expected_total` para no rechazar carritos con precios viejos hasta que la Fase 7 los actualice
+- [ ] Pruebas Vitest (`syncPolicy.test.ts`, `outbox.test.ts`, `syncEngine.test.ts`): backoff y jitter, clasificador, `sendOrQueue` (envío, caída de red con la misma clave, sin conexión, error del servidor), orden FIFO, detención ante fallo transitorio, hora de reintento, pausa por `401`, conflictos sin bloquear la cola, no envío entre usuarios, reenvío de `syncing`, limpieza de `done` — falta ejecutar `npm run test`
+- [ ] Verificación en navegador: sin conexión guardar un pedido, un alta de producto y un cambio de estado → contador "Sincronizar (3)"; volver la conexión → se envían solos, una sola vez (revisar "Mis pedidos" y `/admin/orders`)
 
 ## FASE 7 — Resolución de conflictos
 
@@ -234,7 +236,7 @@ trigger; máquina de estados de pedidos; `APIError{status,message,details}`.
 | 3 | Caché HTTP pública (catálogo, imágenes) | 🟡 Implementada (`tsc -b`, lint y build OK) — faltan `npm run test` y verificación en navegador |
 | 4 | IndexedDB (Dexie): catálogo local + borradores | 🟡 Implementada (`tsc -b`, lint y build OK) — faltan `npm run test` y verificación en navegador |
 | 5 | Backend: idempotencia, `version`, `expected_total`, `from_status` | 🟡 Implementada y verificada contra PostgreSQL — falta ejecutar `go test ./...` |
-| 6 | Outbox + motor de sincronización + Background Sync | ⬜ Pendiente |
+| 6 | Outbox + motor de sincronización + Background Sync | 🟡 Implementada (`tsc -b`, lint, build y `go vet` OK) — faltan `npm run test` y verificación en navegador |
 | 7 | Resolución de conflictos + vista de pendientes | ⬜ Pendiente |
 | 8 | Lectura offline de datos privados (instantáneas por usuario) + pendientes visibles en sus vistas | ⬜ Pendiente |
 | 9 | UX offline, actualizaciones, instalación | ⬜ Pendiente |

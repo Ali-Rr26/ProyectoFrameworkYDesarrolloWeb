@@ -17,6 +17,7 @@ import {
   isPublicCatalogRequest,
   type CacheableRequest,
 } from './pwa/cacheRules';
+import { OUTBOX_SYNC_TAG, SYNC_OUTBOX_MESSAGE } from './offline/syncMessages';
 
 declare let self: ServiceWorkerGlobalScope;
 
@@ -82,5 +83,21 @@ self.addEventListener('message', (event) => {
   if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
-// 6. En la primera instalación el SW toma el control sin esperar una recarga.
+// 6. Background Sync (solo Chromium): al volver la conexión el navegador despierta al SW con
+// la etiqueta 'outbox'. El SW no envía nada (no tiene el JWT): avisa a las pestañas abiertas
+// para que su motor de sincronización (src/offline/syncEngine.ts) envíe los pendientes.
+interface SyncEvent extends ExtendableEvent {
+  readonly tag: string;
+}
+self.addEventListener('sync', (event) => {
+  const syncEvent = event as SyncEvent;
+  if (syncEvent.tag !== OUTBOX_SYNC_TAG) return;
+  syncEvent.waitUntil(
+    self.clients
+      .matchAll({ type: 'window' })
+      .then((clients) => clients.forEach((client) => client.postMessage({ type: SYNC_OUTBOX_MESSAGE }))),
+  );
+});
+
+// 7. En la primera instalación el SW toma el control sin esperar una recarga.
 clientsClaim();

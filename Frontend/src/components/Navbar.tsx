@@ -7,6 +7,7 @@ import { ICON_SIZES } from '../constants/ui';
 import { ROLE_LABELS } from '../data/constants';
 import { draftOwner } from '../offline/drafts';
 import { clearUserData, countPending } from '../offline/userData';
+import SyncIndicator from './SyncIndicator';
 
 interface NavbarProps {
   onMenuClick: () => void;
@@ -81,6 +82,7 @@ const Navbar = ({ onMenuClick, onToggleCollapse, isCollapsed }: NavbarProps) => 
         </h2>
       </div>
       <div className="flex items-center gap-2 sm:gap-6">
+        <SyncIndicator />
         <Link
           to="/cart"
           className="relative p-2 hover:bg-slate-100 rounded-full transition"
