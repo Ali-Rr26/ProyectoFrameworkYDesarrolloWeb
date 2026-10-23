@@ -7,8 +7,7 @@ import { getMyPayouts } from '../services/payoutService';
 import Pagination from './Pagination';
 import { formatDateTime } from '../data/dates';
 import { BUSINESS_TIMEZONE } from '../data/constants';
-
-const PAGE_SIZE = 5;
+import { MY_PAYOUTS_PAGE_SIZE as PAGE_SIZE } from '../services/pageSizes';
 
 // Panel "Mis cobros": cada liquidación recibida (fecha, monto y comisiones que cubrió).
 const PayoutsPanel = () => {

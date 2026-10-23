@@ -7,8 +7,7 @@ import { getMyOrders } from '../services/orderService';
 import { useOutbox } from '../offline/outboxContext';
 import OrderCard from './OrderCard';
 import Pagination from './Pagination';
-
-const PAGE_SIZE = 10;
+import { MY_ORDERS_PAGE_SIZE as PAGE_SIZE } from '../services/pageSizes';
 
 // /my-orders: historial de compras del usuario autenticado (cualquier rol).
 const MyOrders = () => {

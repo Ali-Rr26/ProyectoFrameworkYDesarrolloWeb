@@ -8,8 +8,7 @@ import { createPayout, getPayouts, getPendingDebts } from '../services/payoutSer
 import Pagination from './Pagination';
 import { formatDateTime } from '../data/dates';
 import { BUSINESS_TIMEZONE } from '../data/constants';
-
-const PAGE_SIZE = 10;
+import { ADMIN_PAYOUTS_PAGE_SIZE as PAGE_SIZE } from '../services/pageSizes';
 
 // /admin/payouts: deuda por distribuidor con botón para liquidar e historial de pagos.
 const AdminPayouts = () => {

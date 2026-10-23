@@ -7,7 +7,7 @@
 // - con el botón "Sincronizar ahora" (syncNow).
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { useAuth } from '../context/auth';
+import { useAuth, type Role } from '../context/auth';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { draftOwner } from './drafts';
 import { isOffline, OUTBOX_CHANGED, userOutbox } from './outbox';
@@ -16,13 +16,16 @@ import { OutboxContext } from './outboxContext';
 import { syncOutbox, type SyncReport } from './syncEngine';
 import { refreshCatalog } from './catalogStore';
 import { loadPaymentMethods } from './paymentMethods';
+import { prefetchPrivateViews } from './privatePrefetch';
 
-// Precarga lo que el checkout necesita sin conexión (catálogo y métodos de pago), aunque
-// el usuario nunca haya abierto esas vistas con red. Fallos silenciosos: se reintenta al
-// volver la conexión y cada vista vuelve a pedir sus datos al abrirse.
-const prefetchOfflineData = () => {
+// Precarga lo que se necesita sin conexión aunque el usuario nunca haya abierto esas vistas
+// con red: lo del checkout (catálogo y métodos de pago) y la primera página de cada vista
+// privada de su rol (pedidos, red, liquidaciones, productos, usuarios...). Fallos
+// silenciosos: se reintenta al volver la conexión y cada vista vuelve a pedir sus datos.
+const prefetchOfflineData = (role: Role) => {
   void refreshCatalog().catch(() => undefined);
   void loadPaymentMethods().catch(() => undefined);
+  void prefetchPrivateViews(role);
 };
 
 const NO_ENTRIES: never[] = [];
@@ -58,13 +61,15 @@ export const OutboxProvider = ({ children }: { children: ReactNode }) => {
     void Promise.resolve().then(syncNow);
   }, [syncNow]);
 
-  // Datos para comprar sin conexión: al iniciar sesión y cada vez que vuelve la red.
+  // Datos para usar la app sin conexión: al iniciar sesión y cada vez que vuelve la red.
+  const role = user?.role;
   useEffect(() => {
-    if (!isAuthenticated) return;
-    if (!isOffline()) prefetchOfflineData();
-    window.addEventListener('online', prefetchOfflineData);
-    return () => window.removeEventListener('online', prefetchOfflineData);
-  }, [isAuthenticated, owner]);
+    if (!isAuthenticated || !role) return;
+    const prefetch = () => prefetchOfflineData(role);
+    if (!isOffline()) prefetch();
+    window.addEventListener('online', prefetch);
+    return () => window.removeEventListener('online', prefetch);
+  }, [isAuthenticated, owner, role]);
 
   // Conexión, pendientes nuevos y Background Sync.
   useEffect(() => {

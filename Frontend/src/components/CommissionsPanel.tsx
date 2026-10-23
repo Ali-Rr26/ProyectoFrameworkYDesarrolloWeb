@@ -12,8 +12,8 @@ import { getMyCommissions } from '../services/commissionService';
 import Pagination from './Pagination';
 import { formatDate } from '../data/dates';
 import { BUSINESS_TIMEZONE } from '../data/constants';
+import { MY_COMMISSIONS_PAGE_SIZE as PAGE_SIZE } from '../services/pageSizes';
 
-const PAGE_SIZE = 10;
 const TOTAL_ORDER: CommissionStatus[] = ['pending', 'paid', 'reversed'];
 
 // Panel "Mis comisiones": totales por estado y detalle del ledger, paginado.

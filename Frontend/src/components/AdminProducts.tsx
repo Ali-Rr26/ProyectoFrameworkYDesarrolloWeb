@@ -19,8 +19,7 @@ import {
 import Pagination from './Pagination';
 import ProductForm, { type ProductFieldErrors } from './ProductForm';
 import SearchInput from './SearchInput';
-
-const PAGE_SIZE = 10;
+import { ADMIN_PRODUCTS_PAGE_SIZE as PAGE_SIZE } from '../services/pageSizes';
 
 // El 409 por versión trae el producto vigente en details.
 const isProductDetails = (details: unknown): details is Product =>
