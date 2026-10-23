@@ -3,7 +3,9 @@ package controllers
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
+	"strings"
 
 	// Importamos Fiber para manejar la respuesta HTTP.
 	"github.com/gofiber/fiber/v2"
@@ -133,6 +135,18 @@ func (h *ProductController) UpdateProduct(c *fiber.Ctx) error {
 	if err := c.BodyParser(&in); err != nil {
 		return apiError(c, fiber.StatusBadRequest, "Cuerpo de petición inválido", nil)
 	}
+	// Versión editada: cabecera If-Match ("3") o campo version del cuerpo. Si vienen ambas
+	// deben coincidir; sin ninguna la edición no verifica concurrencia (compatibilidad).
+	if header := c.Get(fiber.HeaderIfMatch); header != "" {
+		version, err := parseIfMatch(header)
+		if err != nil {
+			return apiError(c, fiber.StatusBadRequest, "If-Match inválido: debe ser la versión del producto", header)
+		}
+		if in.Version != nil && *in.Version != version {
+			return apiError(c, fiber.StatusBadRequest, "If-Match y version no coinciden", nil)
+		}
+		in.Version = &version
+	}
 	if fieldErrors := validateProductUpdate(&in); len(fieldErrors) > 0 {
 		return apiError(c, fiber.StatusBadRequest, "Datos de producto inválidos", fieldErrors)
 	}
@@ -171,4 +185,15 @@ func (h *ProductController) DeleteProduct(c *fiber.Ctx) error {
 	}
 	cache.Delete(h.cache, cache.KeyProducts)
 	return c.JSON(product)
+}
+
+// parseIfMatch lee la versión de una cabecera If-Match: acepta 3, "3" y W/"3".
+func parseIfMatch(header string) (int, error) {
+	value := strings.TrimPrefix(strings.TrimSpace(header), "W/")
+	value = strings.Trim(value, `"`)
+	version, err := strconv.Atoi(value)
+	if err != nil || version <= 0 {
+		return 0, fmt.Errorf("versión inválida: %q", header)
+	}
+	return version, nil
 }

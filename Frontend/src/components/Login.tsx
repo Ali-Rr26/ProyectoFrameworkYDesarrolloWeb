@@ -2,7 +2,9 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/auth';
-import { apiFetch, ApiError } from '../services/apiClient';
+import { apiFetch, ApiError, NetworkError } from '../services/apiClient';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
+import InstallAppButton from './InstallAppButton';
 
 // Respuesta de POST /api/login
 interface LoginResponse {
@@ -22,6 +24,8 @@ const Login = () => {
 
   const navigate = useNavigate();
   const { login } = useAuth();
+  // Iniciar sesión valida la contraseña en el servidor: solo con conexión (D8).
+  const online = useOnlineStatus();
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -44,7 +48,11 @@ const Login = () => {
       navigate(role === 'admin' ? '/' : '/store');
     } catch (err) {
       // El backend responde { status, message }: mostramos su mensaje (p. ej. "Credenciales incorrectas").
-      setError(err instanceof ApiError ? err.message : 'Error al conectar con el servidor');
+      setError(err instanceof ApiError
+        ? err.message
+        : err instanceof NetworkError
+          ? 'Requiere conexión: necesitas internet para iniciar sesión'
+          : 'Error al conectar con el servidor');
       console.error(err);
     } finally {
       setLoading(false);
@@ -98,11 +106,14 @@ const Login = () => {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !online}
             className="w-full bg-[#20b2aa] text-white font-bold py-3 rounded-lg hover:bg-[#008080] transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Validando...' : 'Iniciar Sesión'}
           </button>
+          {!online && (
+            <p className="text-sm text-amber-700 text-center">{'Requiere conexión: necesitas internet para iniciar sesión.'}</p>
+          )}
         </form>
         <p className="mt-6 text-center text-sm text-slate-600">
           ¿No tienes cuenta?{' '}
@@ -110,11 +121,8 @@ const Login = () => {
             Crear cuenta
           </Link>
         </p>
-        <div className="mt-6 p-4 bg-slate-50 rounded-lg border border-slate-200 text-xs text-slate-600 space-y-1">
-          <p className="font-semibold text-slate-700">Cuentas de prueba:</p>
-          <p>👑 Admin: <span className="font-mono">admin@upse.edu.ec / 123456</span></p>
-          <p>🛍️ Cliente: <span className="font-mono">cliente@upse.edu.ec / 123456</span></p>
-        </div>
+        {/* Instalar la PWA desde la entrada (solo si el navegador lo permite y no está instalada) */}
+        <InstallAppButton />
       </div>
     </div>
   );

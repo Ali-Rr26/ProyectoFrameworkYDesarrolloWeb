@@ -4,8 +4,10 @@
 -- controladores, para que el frontend muestre la misma información.
 -- Los valores (nombres, descripciones, categorías) quedan en español porque
 -- son contenido que ve el usuario; los identificadores del esquema, en inglés.
--- Contraseña de todos los usuarios demo: 123456 (hash bcrypt vía pgcrypto,
--- compatible con golang.org/x/crypto/bcrypt).
+-- Cada usuario demo tiene su contraseña inicial (columna password, abajo), que
+-- cumple la regla de contraseña fuerte del registro; hash bcrypt vía pgcrypto,
+-- compatible con golang.org/x/crypto/bcrypt. En producción se cambian después
+-- del primer despliegue (ver PROJECT_MAP.md, "Notas operativas").
 -- =============================================================================
 
 -- Catálogos ------------------------------------------------------------------
@@ -52,18 +54,18 @@ CROSS JOIN generate_series(1, 3) AS n (i);
 
 -- Usuarios (ORDER BY pos: IDs deterministas 1..9 en una base nueva) ----------
 INSERT INTO users (email, password_hash, name, role_id)
-SELECT u.email, crypt('123456', gen_salt('bf', 10)), u.name, r.id
+SELECT u.email, crypt(u.password, gen_salt('bf', 10)), u.name, r.id
 FROM (VALUES
-    (1, 'admin@upse.edu.ec',               'Administrador', 'admin'),
-    (2, 'cliente@upse.edu.ec',             'Cliente Demo',  'customer'),
-    (3, 'ana.garcia@multicatalogo.ec',     'Ana García',    'customer'),
-    (4, 'luis.poveda@multicatalogo.ec',    'Luis Poveda',   'customer'),
-    (5, 'marta.sanchez@multicatalogo.ec',  'Marta Sánchez', 'customer'),
-    (6, 'carlos.ruiz@multicatalogo.ec',    'Carlos Ruiz',   'customer'),
-    (7, 'sofia.leon@multicatalogo.ec',     'Sofía León',    'customer'),
-    (8, 'marco.diaz@multicatalogo.ec',     'Marco Díaz',    'customer'),
-    (9, 'diana.paz@multicatalogo.ec',      'Diana Paz',     'customer')
-) AS u (pos, email, name, role)
+    (1, 'admin@upse.edu.ec',               'Administrador', 'admin',    'Admin123#'),
+    (2, 'cliente@upse.edu.ec',             'Cliente Demo',  'customer', 'Cliente123#'),
+    (3, 'ana.garcia@multicatalogo.ec',     'Ana García',    'customer', 'Ana1234#'),
+    (4, 'luis.poveda@multicatalogo.ec',    'Luis Poveda',   'customer', 'Luis123#'),
+    (5, 'marta.sanchez@multicatalogo.ec',  'Marta Sánchez', 'customer', 'Marta123#'),
+    (6, 'carlos.ruiz@multicatalogo.ec',    'Carlos Ruiz',   'customer', 'Carlos123#'),
+    (7, 'sofia.leon@multicatalogo.ec',     'Sofía León',    'customer', 'Sofia123#'),
+    (8, 'marco.diaz@multicatalogo.ec',     'Marco Díaz',    'customer', 'Marco123#'),
+    (9, 'diana.paz@multicatalogo.ec',      'Diana Paz',     'customer', 'Diana123#')
+) AS u (pos, email, name, role, password)
 JOIN roles r ON r.name = u.role
 ORDER BY u.pos;
 

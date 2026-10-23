@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 
 	"multicatalogo-backend/models"
 )
@@ -22,6 +23,8 @@ const selectProduct = `
 	       p.image_url,
 	       p.stock,
 	       p.active,
+	       p.version,
+	       p.updated_at,
 	       COALESCE(
 	           (SELECT json_agg(pi.url ORDER BY pi.position)
 	            FROM product_images pi
@@ -42,11 +45,17 @@ type scanner interface {
 	Scan(dest ...any) error
 }
 
+// rowQuerier abstrae *sql.DB y *sql.Tx: un producto se lee dentro o fuera de una transacción.
+type rowQuerier interface {
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
 // scanProduct lee una fila de selectProduct en un models.Product.
 func scanProduct(s scanner) (models.Product, error) {
 	var p models.Product
 	var gallery []byte
-	if err := s.Scan(&p.ID, &p.Name, &p.Description, &p.Category, &p.Price, &p.Image, &p.Stock, &p.Active, &gallery); err != nil {
+	if err := s.Scan(&p.ID, &p.Name, &p.Description, &p.Category, &p.Price, &p.Image, &p.Stock, &p.Active,
+		&p.Version, &p.UpdatedAt, &gallery); err != nil {
 		return p, err
 	}
 	if err := json.Unmarshal(gallery, &p.Gallery); err != nil {
@@ -101,16 +110,17 @@ func (r *Repository) listProducts(ctx context.Context, query string, args ...any
 // GetProductByID devuelve un producto activo, o ErrNotFound si no existe o fue dado de
 // baja (para el público un producto inactivo ya no existe).
 func (r *Repository) GetProductByID(ctx context.Context, id int) (*models.Product, error) {
-	return r.findProduct(ctx, selectProduct+` WHERE p.id = $1 AND p.active`, id)
+	return findProduct(ctx, r.db, selectProduct+` WHERE p.id = $1 AND p.active`, id)
 }
 
-// getAnyProduct devuelve un producto activo o inactivo (respuestas del admin).
-func (r *Repository) getAnyProduct(ctx context.Context, id int) (*models.Product, error) {
-	return r.findProduct(ctx, selectProduct+` WHERE p.id = $1`, id)
+// getAnyProduct devuelve un producto activo o inactivo (respuestas del admin). Con un
+// *sql.Tx lee lo escrito por la transacción antes del COMMIT.
+func getAnyProduct(ctx context.Context, q rowQuerier, id int) (*models.Product, error) {
+	return findProduct(ctx, q, selectProduct+` WHERE p.id = $1`, id)
 }
 
-func (r *Repository) findProduct(ctx context.Context, query string, id int) (*models.Product, error) {
-	p, err := scanProduct(r.db.QueryRowContext(ctx, query, id))
+func findProduct(ctx context.Context, q rowQuerier, query string, id int) (*models.Product, error) {
+	p, err := scanProduct(q.QueryRowContext(ctx, query, id))
 	if err != nil {
 		return nil, mapError(err)
 	}
@@ -169,6 +179,11 @@ func (r *Repository) CreateProduct(ctx context.Context, in models.ProductInput) 
 	}
 	defer tx.Rollback()
 
+	// Reintento de un alta enviada sin conexión: la clave impide crear el producto dos veces.
+	if err := claimIdempotency(ctx, tx); err != nil {
+		return nil, err
+	}
+
 	// La categoría debe existir en el catálogo; se busca sin distinguir mayúsculas.
 	categoryID, err := findCategoryID(ctx, tx, in.Category)
 	if err != nil {
@@ -190,15 +205,23 @@ func (r *Repository) CreateProduct(ctx context.Context, in models.ProductInput) 
 		return nil, err
 	}
 
+	product, err := getAnyProduct(ctx, tx, id)
+	if err != nil {
+		return nil, err
+	}
+	if err := storeIdempotentResponse(ctx, tx, http.StatusCreated, product); err != nil {
+		return nil, err
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	return r.getAnyProduct(ctx, id)
+	return product, nil
 }
 
 // UpdateProduct aplica una edición parcial en una transacción (los nil no cambian) y
 // devuelve el producto actualizado, o ErrNotFound si no existe. Bloquea la fila para que
-// una edición de stock no se mezcle con una compra en curso.
+// una edición de stock no se mezcle con una compra en curso. Si in.Version viene y no es
+// la vigente, no modifica nada y devuelve *VersionConflictError con el producto actual.
 func (r *Repository) UpdateProduct(ctx context.Context, id int, in models.ProductUpdate) (*models.Product, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -206,9 +229,20 @@ func (r *Repository) UpdateProduct(ctx context.Context, id int, in models.Produc
 	}
 	defer tx.Rollback()
 
-	var locked int
-	if err := tx.QueryRowContext(ctx, `SELECT id FROM products WHERE id = $1 FOR UPDATE`, id).Scan(&locked); err != nil {
+	if err := claimIdempotency(ctx, tx); err != nil {
+		return nil, err
+	}
+
+	var version int
+	if err := tx.QueryRowContext(ctx, `SELECT version FROM products WHERE id = $1 FOR UPDATE`, id).Scan(&version); err != nil {
 		return nil, mapError(err)
+	}
+	if in.Version != nil && *in.Version != version {
+		current, err := getAnyProduct(ctx, tx, id)
+		if err != nil {
+			return nil, err
+		}
+		return nil, &VersionConflictError{Current: current}
 	}
 
 	var categoryID *int
@@ -241,10 +275,17 @@ func (r *Repository) UpdateProduct(ctx context.Context, id int, in models.Produc
 		}
 	}
 
+	product, err := getAnyProduct(ctx, tx, id)
+	if err != nil {
+		return nil, err
+	}
+	if err := storeIdempotentResponse(ctx, tx, http.StatusOK, product); err != nil {
+		return nil, err
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	return r.getAnyProduct(ctx, id)
+	return product, nil
 }
 
 // DeactivateProduct da de baja un producto (baja lógica: no se borra la fila, así el
@@ -259,5 +300,5 @@ func (r *Repository) DeactivateProduct(ctx context.Context, id int) (*models.Pro
 	} else if n == 0 {
 		return nil, ErrNotFound
 	}
-	return r.getAnyProduct(ctx, id)
+	return getAnyProduct(ctx, r.db, id)
 }

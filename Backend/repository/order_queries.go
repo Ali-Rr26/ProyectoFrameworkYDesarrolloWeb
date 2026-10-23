@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"net/http"
 
 	"multicatalogo-backend/models"
 )
@@ -114,16 +115,26 @@ func getOrder(ctx context.Context, q queryer, id int) (*models.OrderDetail, erro
 //  2. rechaza la cancelación si alguna comisión ya se liquidó (no se revierte dinero pagado);
 //  3. repone el stock de cada línea (bloqueando los productos en orden de ID, igual que el
 //     checkout, para evitar interbloqueos) y revierte las comisiones pendientes.
-func (r *Repository) UpdateOrderStatus(ctx context.Context, id int, status string) (*models.OrderDetail, error) {
+//
+// fromStatus (opcional) es el estado que vio el cliente: si el pedido ya está en otro,
+// no se cambia nada y se devuelve *StatusChangedError con el estado vigente.
+func (r *Repository) UpdateOrderStatus(ctx context.Context, id int, status, fromStatus string) (*models.OrderDetail, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback()
 
+	if err := claimIdempotency(ctx, tx); err != nil {
+		return nil, err
+	}
+
 	var current string
 	if err := tx.QueryRowContext(ctx, `SELECT status FROM orders WHERE id = $1 FOR UPDATE`, id).Scan(&current); err != nil {
 		return nil, mapError(err)
+	}
+	if fromStatus != "" && fromStatus != current {
+		return nil, &StatusChangedError{Current: current}
 	}
 	if !models.OrderTransitionAllowed(current, status) {
 		return nil, &DomainError{Kind: ErrInvalidTransition, Detail: fmt.Sprintf("%s → %s", current, status), Public: true}
@@ -167,6 +178,9 @@ func (r *Repository) UpdateOrderStatus(ctx context.Context, id int, status strin
 
 	detail, err := getOrder(ctx, tx, id)
 	if err != nil {
+		return nil, err
+	}
+	if err := storeIdempotentResponse(ctx, tx, http.StatusOK, detail); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {

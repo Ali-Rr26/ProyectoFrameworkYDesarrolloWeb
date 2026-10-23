@@ -7,7 +7,7 @@ import {
   type CommissionStatus,
 } from '../data/commissions';
 import { orderNumber } from '../data/orders';
-import { ApiError } from '../services/apiClient';
+import { errorMessage } from '../services/apiClient';
 import { getMyCommissions } from '../services/commissionService';
 import Pagination from './Pagination';
 import { formatDate } from '../data/dates';
@@ -26,7 +26,7 @@ const CommissionsPanel = () => {
     let active = true;
     getMyCommissions(page, PAGE_SIZE)
       .then((l) => active && setLedger(l))
-      .catch((err) => active && setError(err instanceof ApiError ? err.message : 'No se pudieron cargar tus comisiones'));
+      .catch((err) => active && setError(errorMessage(err, 'No se pudieron cargar tus comisiones')));
     return () => {
       active = false;
     };

@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
+	"net/http"
 	"sort"
 	"time"
 
@@ -40,6 +42,12 @@ func (r *Repository) CreateOrder(ctx context.Context, userID int, req models.Cre
 	}
 	// Rollback tras un Commit exitoso no hace nada; ante cualquier error deshace todo.
 	defer tx.Rollback()
+
+	// Pedido guardado sin conexión y reenviado: la clave impide registrarlo (y pagar sus
+	// comisiones) dos veces. Se reserva en esta misma transacción.
+	if err := claimIdempotency(ctx, tx); err != nil {
+		return nil, err
+	}
 
 	// El comprador (tomado del JWT) debe seguir existiendo y estar activo:
 	// un token emitido antes de desactivar la cuenta no permite comprar.
@@ -107,6 +115,12 @@ func (r *Repository) CreateOrder(ctx context.Context, userID int, req models.Cre
 		return nil, fmt.Errorf("calcular total del pedido: %w", err)
 	}
 
+	// El cliente vio otro total (precios cambiados mientras el pedido esperaba sin
+	// conexión): no se cobra un monto distinto al que aceptó; ROLLBACK y 409.
+	if req.ExpectedTotal != nil && totalsDiffer(*req.ExpectedTotal, order.Total) {
+		return nil, &PriceChangedError{Expected: *req.ExpectedTotal, Total: order.Total}
+	}
+
 	// ===== PUNTO DE FALLA 3 (CHECKOUT_COMMIT_DELAY=10s) =====
 	// Pausa antes del COMMIT: da tiempo a ejecutar `docker kill multicatalogo-db`.
 	// Si la conexión se corta, PostgreSQL descarta la transacción al recuperarse.
@@ -119,10 +133,19 @@ func (r *Repository) CreateOrder(ctx context.Context, userID int, req models.Cre
 		}
 	}
 
+	if err := storeIdempotentResponse(ctx, tx, http.StatusCreated, &order); err != nil {
+		return nil, err
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("confirmar pedido: %w", err)
 	}
 	return &order, nil
+}
+
+// totalsDiffer compara montos en dólares con tolerancia de medio centavo (los totales
+// viajan como float64 y pueden diferir en el último decimal sin que cambie el precio).
+func totalsDiffer(a, b float64) bool {
+	return math.Abs(a-b) >= 0.005
 }
 
 // simulatedFailure registra la falla inyectada y devuelve ErrSimulatedFailure.

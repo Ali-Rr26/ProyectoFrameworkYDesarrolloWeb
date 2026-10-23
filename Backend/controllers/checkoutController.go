@@ -110,6 +110,9 @@ func validateOrder(req *models.CreateOrderRequest) map[string]string {
 			fieldErrors[fmt.Sprintf("items[%d].product_id", i)] = "debe ser mayor que cero"
 		}
 	}
+	if req.ExpectedTotal != nil && *req.ExpectedTotal <= 0 {
+		fieldErrors["expected_total"] = "debe ser mayor que cero"
+	}
 	return fieldErrors
 }
 

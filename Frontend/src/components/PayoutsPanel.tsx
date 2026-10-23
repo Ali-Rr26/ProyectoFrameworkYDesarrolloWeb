@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import type { Page } from '../data/orders';
 import type { Payout } from '../data/payouts';
-import { ApiError } from '../services/apiClient';
+import { errorMessage } from '../services/apiClient';
 import { getMyPayouts } from '../services/payoutService';
 import Pagination from './Pagination';
 import { formatDateTime } from '../data/dates';
@@ -20,7 +20,7 @@ const PayoutsPanel = () => {
     let active = true;
     getMyPayouts(page, PAGE_SIZE)
       .then((r) => active && setResult(r))
-      .catch((err) => active && setError(err instanceof ApiError ? err.message : 'No se pudieron cargar tus cobros'));
+      .catch((err) => active && setError(errorMessage(err, 'No se pudieron cargar tus cobros')));
     return () => {
       active = false;
     };

@@ -41,7 +41,12 @@ type OrderRepository interface {
 type OrderQueryRepository interface {
 	ListOrders(ctx context.Context, f models.OrderFilter) (*models.Page[models.OrderSummary], error)
 	GetOrder(ctx context.Context, id int) (*models.OrderDetail, error)
-	UpdateOrderStatus(ctx context.Context, id int, status string) (*models.OrderDetail, error)
+	UpdateOrderStatus(ctx context.Context, id int, status, fromStatus string) (*models.OrderDetail, error)
+}
+
+// IdempotencyStore consulta las respuestas guardadas de las escrituras con Idempotency-Key.
+type IdempotencyStore interface {
+	GetIdempotencyRecord(ctx context.Context, userID int, key string) (*models.IdempotencyRecord, error)
 }
 
 // CommissionQueryRepository es la consulta del ledger de comisiones de un distribuidor.

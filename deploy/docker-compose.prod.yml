@@ -1,0 +1,85 @@
+# Stack de producción: PostgreSQL + Redis + API Go + Caddy (PWA) + Cloudflare Tunnel.
+# Uso (desde la carpeta deploy, con deploy/.env creado a partir de .env.example):
+#   docker compose -f docker-compose.prod.yml up -d --build
+# Ningún servicio publica puertos: cloudflared abre una conexión de salida hacia
+# Cloudflare, que pone el HTTPS y reenvía el tráfico a Caddy (web:80).
+# Imágenes con versión exacta: cada despliegue usa las mismas; Dependabot propone las
+# actualizaciones como PR (.github/dependabot.yml) y pasan por CI antes de llegar aquí.
+services:
+  postgres:
+    image: postgres:16.15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-multicatalogo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Definir POSTGRES_PASSWORD en deploy/.env}
+      POSTGRES_DB: ${POSTGRES_DB:-multicatalogo}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-multicatalogo} -d ${POSTGRES_DB:-multicatalogo}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:8.10.2-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build: ../Backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-multicatalogo}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-multicatalogo}?sslmode=disable
+      REDIS_URL: redis://redis:6379/0
+      PORT: "4000"
+      APP_ENV: production
+      APP_TIMEZONE: ${APP_TIMEZONE:-America/Guayaquil}
+      CORS_ORIGIN: https://${DOMAIN:?Definir DOMAIN en deploy/.env}
+      NETWORK_ROOT_EMAIL: ${NETWORK_ROOT_EMAIL:-cliente@upse.edu.ec}
+      JWT_SECRET: ${JWT_SECRET:?Definir JWT_SECRET en deploy/.env}
+      JWT_TTL: ${JWT_TTL:-2h}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ../Frontend
+      args:
+        VITE_API_URL: https://${API_DOMAIN:?Definir API_DOMAIN en deploy/.env}
+        VITE_BUSINESS_TIMEZONE: ${APP_TIMEZONE:-America/Guayaquil}
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN}
+      API_DOMAIN: ${API_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  # Túnel hacia Cloudflare, creado con `cloudflared tunnel create` (no requiere Zero Trust).
+  # deploy/cloudflared/ contiene config.yml (rutas dominio -> http://web:80) y
+  # credentials.json (secreto del túnel); ambos fuera de git.
+  cloudflared:
+    image: cloudflare/cloudflared:2026.10.3
+    restart: unless-stopped
+    command: tunnel --no-autoupdate --config /etc/cloudflared/config.yml run
+    volumes:
+      - ./cloudflared:/etc/cloudflared:ro
+    depends_on:
+      - web
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

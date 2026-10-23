@@ -11,6 +11,10 @@ export interface Product {
   stock: number;
   // false si fue dado de baja (solo lo ve el admin; el catálogo público no lo incluye)
   active: boolean;
+  // Sube con cada cambio del producto (incluidas las ventas): se envía al editar para que
+  // el servidor rechace con 409 una edición hecha sobre datos viejos
+  version: number;
+  updated_at: string;
 }
 
 // Cuerpo de POST /api/products (solo admin)
@@ -25,4 +29,5 @@ export interface ProductInput {
 }
 
 // Cuerpo de PUT /api/products/:id (solo admin): edición parcial; active reactiva un producto
-export type ProductUpdate = Partial<ProductInput> & { active?: boolean };
+// version: la que se editó; si el producto cambió mientras tanto, el servidor responde 409
+export type ProductUpdate = Partial<ProductInput> & { active?: boolean; version?: number };

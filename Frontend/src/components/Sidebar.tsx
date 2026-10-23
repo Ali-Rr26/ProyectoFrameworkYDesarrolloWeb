@@ -1,8 +1,9 @@
 import { Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, PackageSearch, Contact, Store, Users, Package, ReceiptText, ClipboardList, Wallet } from 'lucide-react';
+import { LayoutDashboard, PackageSearch, Contact, Store, Users, Package, ReceiptText, ClipboardList, Wallet, CloudUpload } from 'lucide-react';
 import { useAuth } from '../context/auth';
 import { ICON_SIZES } from '../constants/ui';
 import { ROLE_LABELS } from '../data/constants';
+import { useOutbox } from '../offline/outboxContext';
 
 // Definimos las opciones de navegación según el rol (Tema 5)
 interface NavItem {
@@ -11,6 +12,8 @@ interface NavItem {
   title: string;
   icon: React.ReactNode;
   adminOnly?: boolean;
+  // Contador junto al ícono (p. ej. pendientes de envío)
+  badge?: number;
 }
 
 interface SidebarProps {
@@ -21,6 +24,7 @@ interface SidebarProps {
 
 const Sidebar = ({ isOpen, isCollapsed, onCloseSidebar }: SidebarProps) => {
   const { user } = useAuth();
+  const { entries } = useOutbox();
   const { pathname } = useLocation();
   const showTitle = !isCollapsed;
 
@@ -57,6 +61,13 @@ const Sidebar = ({ isOpen, isCollapsed, onCloseSidebar }: SidebarProps) => {
       icon: <Contact size={ICON_SIZES.SIDEBAR} className="flex-shrink-0" />,
     },
     {
+      to: "/pending",
+      label: "Pendientes",
+      title: "Pendientes de envío",
+      badge: entries.length,
+      icon: <CloudUpload size={ICON_SIZES.SIDEBAR} className="flex-shrink-0" />,
+    },
+    {
       to: "/admin/orders",
       label: "Pedidos",
       title: "Pedidos",
@@ -87,7 +98,10 @@ const Sidebar = ({ isOpen, isCollapsed, onCloseSidebar }: SidebarProps) => {
   ];
 
   // Filtramos las opciones según el rol del usuario
-  const items = NAV_ITEMS.filter((item) => !item.adminOnly || user?.role === "admin");
+  // "Pendientes" solo aparece cuando hay operaciones sin enviar.
+  const items = NAV_ITEMS.filter(
+    (item) => (!item.adminOnly || user?.role === "admin") && (item.to !== "/pending" || entries.length > 0)
+  );
 
   return (
     <>
@@ -104,7 +118,7 @@ const Sidebar = ({ isOpen, isCollapsed, onCloseSidebar }: SidebarProps) => {
       )}
 
       {/* Sidebar */}
-      <aside className={`${isOpen ? "w-64" : "w-0"} fixed lg:static left-0 top-0 h-screen lg:h-auto bg-[#40d9d8] text-white flex flex-col transition-all duration-300 overflow-hidden border-r-2 border-[#20b2aa] z-40 ${isCollapsed ? "lg:w-20" : "lg:w-64"}`}>
+      <aside className={`${isOpen ? "w-64" : "w-0"} fixed lg:static left-0 top-0 h-screen lg:h-auto pt-[env(safe-area-inset-top)] lg:pt-0 bg-[#40d9d8] text-white flex flex-col transition-all duration-300 overflow-hidden border-r-2 border-[#20b2aa] z-40 ${isCollapsed ? "lg:w-20" : "lg:w-64"}`}>
         <div className={`p-6 ${isCollapsed ? "lg:p-3" : ""} border-b border-[#20b2aa] flex items-center justify-center group relative`}>
           <Store size={32} className="flex-shrink-0" />
           <span className="text-2xl font-bold whitespace-nowrap ml-3 lg:hidden">MultiCatálogo</span>
@@ -139,6 +153,11 @@ const Sidebar = ({ isOpen, isCollapsed, onCloseSidebar }: SidebarProps) => {
                 title={item.title}
               >
                 {item.icon}
+                {item.badge ? (
+                  <span className={`bg-amber-500 text-white text-xs font-bold rounded-full min-w-5 h-5 px-1 flex items-center justify-center ${isCollapsed ? "lg:absolute lg:top-1 lg:right-1" : ""}`}>
+                    {item.badge}
+                  </span>
+                ) : null}
                 <span className="whitespace-nowrap lg:hidden">{item.label}</span>
                 {!isCollapsed && <span className="hidden lg:inline whitespace-nowrap">{item.label}</span>}
                 {isCollapsed && (

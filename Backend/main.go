@@ -30,6 +30,10 @@ import (
 // shutdownTimeout es lo máximo que se espera a las goroutines de comisiones al apagar.
 const shutdownTimeout = 15 * time.Second
 
+// idempotencyKeyTTL es cuánto se conserva la respuesta de una escritura con Idempotency-Key:
+// cubre de sobra el tiempo que un pedido puede esperar sin conexión en el outbox de la PWA.
+const idempotencyKeyTTL = 7 * 24 * time.Hour
+
 // func main es el punto de entrada de la aplicación en Go. Todo comienza a ejecutarse aquí.
 func main() {
 	// Modo sonda para el HEALTHCHECK de Docker: verifica el servidor ya en marcha y termina
@@ -99,7 +103,13 @@ func main() {
 		Reports:     controllers.NewReportController(repo, cfg.Location),
 		Users:       controllers.NewUserController(repo, networkCache),
 		Health:      controllers.NewHealthController(repo, redisCache),
+		Idempotency: controllers.NewIdempotency(repo),
 	}
+
+	// Limpieza de claves de idempotencia vencidas: al arrancar y una vez al día.
+	cleanupCtx, stopCleanup := context.WithCancel(context.Background())
+	defer stopCleanup()
+	go services.RunIdempotencyCleanup(cleanupCtx, repo, idempotencyKeyTTL, 24*time.Hour)
 
 	// Instanciamos una nueva aplicación de Fiber y la guardamos en la variable 'app'.
 	app := fiber.New()
@@ -109,9 +119,11 @@ func main() {
 		// Permitimos únicamente peticiones provenientes del frontend configurado.
 		AllowOrigins: cfg.CORSOrigin,
 		// Declaramos de forma explícita qué cabeceras (Headers) se permitirán en la comunicación.
-		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
-		// Permitimos que el frontend lea X-Cache (HIT/MISS/BYPASS): sin esto CORS la oculta a JavaScript.
-		ExposeHeaders: "X-Cache",
+		// Idempotency-Key e If-Match los usa la sincronización offline de la PWA.
+		AllowHeaders: "Origin, Content-Type, Accept, Authorization, Idempotency-Key, If-Match",
+		// Permitimos que el frontend lea X-Cache (HIT/MISS/BYPASS) e Idempotent-Replayed:
+		// sin esto CORS las oculta a JavaScript.
+		ExposeHeaders: "X-Cache, Idempotent-Replayed",
 	}))
 
 	// Detalle técnico de los errores solo en desarrollo (APP_ENV=dev).
