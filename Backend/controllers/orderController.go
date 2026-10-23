@@ -102,11 +102,17 @@ func (h *OrderController) UpdateStatus(c *fiber.Ctx) error {
 		return apiError(c, fiber.StatusBadRequest, "Estado de pedido inválido",
 			map[string]string{"status": "debe ser pending, preparing, shipped, delivered o cancelled"})
 	}
+	// Estado que vio el cliente (opcional): si el pedido ya cambió, el repositorio responde 409.
+	fromStatus := strings.ToLower(strings.TrimSpace(req.FromStatus))
+	if fromStatus != "" && !models.ValidOrderStatus(fromStatus) {
+		return apiError(c, fiber.StatusBadRequest, "Estado de pedido inválido",
+			map[string]string{"from_status": "debe ser pending, preparing, shipped, delivered o cancelled"})
+	}
 
 	ctx, cancel := dbCtx(c)
 	defer cancel()
 
-	order, err := h.orders.UpdateOrderStatus(ctx, id, status)
+	order, err := h.orders.UpdateOrderStatus(ctx, id, status, fromStatus)
 	if errors.Is(err, repository.ErrNotFound) {
 		return apiError(c, fiber.StatusNotFound, "Pedido no encontrado", id)
 	}

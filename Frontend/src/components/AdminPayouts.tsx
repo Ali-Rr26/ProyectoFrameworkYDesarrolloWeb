@@ -2,7 +2,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { Page } from '../data/orders';
 import type { Payout, PendingDebt } from '../data/payouts';
-import { ApiError } from '../services/apiClient';
+import { errorMessage } from '../services/apiClient';
+import { useOutbox } from '../offline/outboxContext';
 import { createPayout, getPayouts, getPendingDebts } from '../services/payoutService';
 import Pagination from './Pagination';
 import { formatDateTime } from '../data/dates';
@@ -17,19 +18,21 @@ const AdminPayouts = () => {
   const [page, setPage] = useState<number>(1);
   const [error, setError] = useState<string>('');
   const [notice, setNotice] = useState<string>('');
+  // Liquidar mueve dinero: solo con conexión (D8).
+  const { online } = useOutbox();
   // Distribuidor que se está liquidando
   const [payingId, setPayingId] = useState<number | null>(null);
 
   const loadDebts = useCallback(() => {
     getPendingDebts()
       .then(setDebts)
-      .catch((err) => setError(err instanceof ApiError ? err.message : 'No se pudo cargar la deuda'));
+      .catch((err) => setError(errorMessage(err, 'No se pudo cargar la deuda')));
   }, []);
 
   const loadHistory = useCallback(() => {
     getPayouts(page, PAGE_SIZE)
       .then(setHistory)
-      .catch((err) => setError(err instanceof ApiError ? err.message : 'No se pudo cargar el historial'));
+      .catch((err) => setError(errorMessage(err, 'No se pudo cargar el historial')));
   }, [page]);
 
   useEffect(loadDebts, [loadDebts]);
@@ -49,7 +52,7 @@ const AdminPayouts = () => {
       if (page === 1) loadHistory();
       else setPage(1);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'No se pudo registrar el pago');
+      setError(errorMessage(err, 'No se pudo registrar el pago'));
       loadDebts(); // la deuda pudo cambiar (p. ej. otro admin ya la liquidó)
     } finally {
       setPayingId(null);
@@ -94,8 +97,8 @@ const AdminPayouts = () => {
                     ${debt.ready_total.toFixed(2)}
                   </p>
                 </div>
-                <button type="button" disabled={payingId !== null || debt.ready_count === 0} onClick={() => pay(debt)}
-                  title={debt.ready_count === 0 ? 'Sus comisiones esperan la entrega de los pedidos' : undefined}
+                <button type="button" disabled={payingId !== null || debt.ready_count === 0 || !online} onClick={() => pay(debt)}
+                  title={!online ? 'Requiere conexión: esta operación no se puede guardar sin conexión' : debt.ready_count === 0 ? 'Sus comisiones esperan la entrega de los pedidos' : undefined}
                   className="min-h-11 px-6 bg-[#20b2aa] text-white font-semibold rounded-lg hover:bg-[#008080] transition disabled:opacity-50">
                   {payingId === debt.beneficiary_id ? 'Liquidando...' : 'Liquidar'}
                 </button>

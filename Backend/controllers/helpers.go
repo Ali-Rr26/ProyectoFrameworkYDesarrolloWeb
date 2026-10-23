@@ -103,6 +103,26 @@ func repoError(c *fiber.Ctx, err error) error {
 		detail = de.Detail
 	}
 
+	// Conflictos de la sincronización offline: el detalle es lo que el cliente necesita
+	// para resolverlos (producto vigente, total vigente, estado vigente).
+	var versionConflict *repository.VersionConflictError
+	var priceChanged *repository.PriceChangedError
+	var statusChanged *repository.StatusChangedError
+	switch {
+	case errors.As(err, &versionConflict):
+		return apiError(c, fiber.StatusConflict, "El producto fue modificado mientras lo editabas", versionConflict.Current)
+	case errors.As(err, &priceChanged):
+		return apiError(c, fiber.StatusConflict, "Los precios cambiaron desde que armaste el pedido",
+			map[string]float64{"expected_total": priceChanged.Expected, "total": priceChanged.Total})
+	case errors.As(err, &statusChanged):
+		return apiError(c, fiber.StatusConflict, "El pedido cambió de estado mientras tanto",
+			map[string]string{"status": statusChanged.Current})
+	case errors.Is(err, repository.ErrIdempotencyInProgress):
+		// retryable distingue este 409 (reintentar más tarde) de los conflictos de datos.
+		return apiError(c, fiber.StatusConflict, "Esta operación ya se está procesando; reintenta en unos segundos",
+			map[string]bool{"retryable": true})
+	}
+
 	switch {
 	case errors.Is(err, repository.ErrNotFound):
 		return apiError(c, fiber.StatusNotFound, "Recurso no encontrado", detail)

@@ -123,3 +123,56 @@ React SPA (:5173) ──► Caddy/Nginx (U4: proxy inverso + SSL)
 - [x] Errores sanitizados: `Details` solo con `APP_ENV=dev`; `ErrInvalidQuantity` propio (400 "cantidad debe ser mayor que cero", distinto de stock)
 
 ---
+
+# PWA — MultiCatálogo offline-first
+
+> Plan detallado, decisiones (D1–D13) y verificación por ítem en **`PLAN_PWA.md`**.
+> Resumen: `vite-plugin-pwa` en modo `injectManifest` (SW propio con Workbox),
+> IndexedDB con Dexie, outbox con `Idempotency-Key` y motor de sincronización en la
+> página (Background Sync solo como acelerador), conflictos resueltos por tipo de
+> operación con el servidor como autoridad.
+
+## PWA-F0 · Preparación y metadatos
+- [x] `index.html` (`lang="es"`, título, `description`, `theme-color`), identidad PWA (`PWA_IDENTITY`), limpieza del scaffold
+- [ ] Vitest + `fake-indexeddb` configurado — falta ejecutar `npm run test`
+
+## PWA-F1 · Íconos
+- [x] `@vite-pwa/assets-generator` (`npm run icons`) desde logo propio `favicon.svg`: 64, 192, 512, maskable, `apple-touch-icon`, `favicon.ico` + enlaces en `index.html`
+
+## PWA-F2 · Service worker propio y manifest (instalable)
+- [x] `injectManifest` con `src/sw.ts` (`precacheAndRoute`, `NavigationRoute`, `SKIP_WAITING`, `clientsClaim`) + manifest `standalone` desde `PWA_IDENTITY` + `tsconfig.sw.json`; build genera `sw.js` y `manifest.webmanifest`
+- [ ] Verificación en navegador: instalable y la interfaz abre offline (`npm run build && npm run preview`)
+
+## PWA-F3 · Caché HTTP pública
+- [x] Catálogo `NetworkFirst` (antes `StaleWhileRevalidate`, cambiado en F4), imágenes `CacheFirst` (60 entradas), nada con `Authorization` ni métodos de escritura en Cache Storage — reglas puras en `src/pwa/cacheRules.ts`
+- [ ] Pruebas de `cacheRules` (`npm run test`) y verificación de Cache Storage en navegador
+
+## PWA-F4 · Capa local IndexedDB (Dexie)
+- [x] `OfflineDB` (`products`, `meta`, `drafts`, `outbox`), catálogo local con `useLiveQuery` en `Storefront`/`Catalog`/`ProductDetail`, `useDraft` en `Checkout`/`ProductForm`/`Register`, `storage.persist()`, limpieza por usuario al cerrar sesión
+- [ ] Pruebas de la capa local (`npm run test`) y verificación offline en navegador
+
+## PWA-F5 · Backend preparado para sincronizar
+- [x] Migración `0006_sync.sql` (`products.version`/`updated_at`, `idempotency_keys`), middleware `Idempotency` con la clave guardada en la misma transacción, limpieza a 7 días, `409` por `version`/`If-Match`, `expected_total` y `from_status`, CORS
+- [x] Verificación contra PostgreSQL (idempotencia, `expected_total`, `If-Match`, `from_status`)
+- [ ] Pruebas Go (`go test ./...`)
+
+## PWA-F6 · Outbox y motor de sincronización
+- [x] `NetworkError` en `apiClient`, `enqueue`/`sendOrQueue` con UUID como `Idempotency-Key`, estados `pending/syncing/done/conflict/failed`, FIFO por usuario, `navigator.locks`, backoff con jitter, pausa en `401`, disparo por arranque/login/`online`/Background Sync, botón "Sincronizar" en `Navbar`, `Checkout` sin red → "Guardar pedido", altas/ediciones de producto y cambios de estado encolables
+- [ ] Pruebas (`npm run test`) y verificación offline → online en navegador
+
+## PWA-F7 · Resolución de conflictos
+- [x] Checkout rechazado → carrito reconstruido con stock/precio vigentes y re-confirmación; comparación campo a campo de productos con combinación a tres bandas (también para el `409` en línea); estado de pedido con "Aplicar de todos modos" si sigue siendo válido; vista `/pending` con contador en `Sidebar`/`Navbar`
+- [ ] Pruebas (`npm run test`) y verificación de conflictos en navegador
+
+## PWA-F8 · Lectura sin conexión de datos privados
+- [x] Tabla `snapshots` (esquema v2), `withSnapshot` + `snapshotGet` en los servicios privados, aviso global "datos guardados el {fecha}" y "Requiere conexión" en `Dashboard`, `MyOrders`, `MyNetwork`, comisiones, liquidaciones y listados admin; pendientes del outbox visibles en su vista; escrituras solo online deshabilitadas sin red; limpieza al cerrar sesión, caducidad 7 días y tope de 200
+- [ ] Pruebas (`npm run test`) y verificación offline en navegador
+
+## PWA-F9 · Experiencia offline, actualizaciones e instalación
+- [x] `useOnlineStatus` + franja de conexión, login/registro "Requiere conexión", `ReloadPrompt` ("Nueva versión disponible", pospuesto en `/checkout` y durante la sincronización), "Instalar app" (`beforeinstallprompt` + instrucciones iOS), `viewport-fit=cover` y `safe-area-inset`
+- [ ] Pruebas (`npm run test`), verificación a 360px y prueba completa offline → online sin pedidos duplicados
+
+## PWA-F10 · HTTPS y validación final (depende de U4)
+- [x] Despliegue con Cloudflare Tunnel + Caddy (`deploy/`), API en subdominio con `CORS_ORIGIN` y `VITE_API_URL` de producción, cabeceras `no-cache`/`immutable` (404 en assets inexistentes), imágenes Docker con versión fija + Dependabot, `PROJECT_MAP.md`
+- [x] CI/CD con GitHub Actions (`ci.yml`: pruebas, lint y build; `deploy.yml`: despliegue en runner self-hosted tras CI verde en `main`); login sin credenciales visibles y contraseñas fuertes en el seed
+- [ ] Desplegar en el servidor, Lighthouse ≥ 90, pruebas en Android/escritorio/iOS, imágenes en origen propio con CORS

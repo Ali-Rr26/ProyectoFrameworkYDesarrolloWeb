@@ -27,24 +27,45 @@ export class ApiError extends Error {
   }
 }
 
-interface ApiOptions {
+// 4. Fallo de red: la petición no llegó a recibir respuesta (sin conexión, servidor caído,
+// CORS). Se distingue de ApiError (el servidor sí respondió con un error): una escritura
+// que falla por red se puede guardar en el outbox y reenviar con la misma Idempotency-Key.
+export class NetworkError extends Error {
+  constructor(message = 'Sin conexión con el servidor') {
+    super(message);
+    this.name = 'NetworkError';
+  }
+}
+
+export interface ApiOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   body?: unknown;
   // auth=false para rutas públicas (login, catálogo): no envía token ni dispara el cierre de sesión.
   auth?: boolean;
+  // Cabeceras adicionales (p. ej. Idempotency-Key en las escrituras reintentables).
+  headers?: Record<string, string>;
 }
 
-// 4. Cliente HTTP único: agrega JSON, cabecera Authorization y traduce errores.
-export const apiFetch = async <T>(path: string, { method = 'GET', body, auth = true }: ApiOptions = {}): Promise<T> => {
-  const headers: Record<string, string> = {};
+// 5. Cliente HTTP único: agrega JSON, cabecera Authorization y traduce errores.
+export const apiFetch = async <T>(
+  path: string,
+  { method = 'GET', body, auth = true, headers: extraHeaders = {} }: ApiOptions = {},
+): Promise<T> => {
+  const headers: Record<string, string> = { ...extraHeaders };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (auth && authToken) headers['Authorization'] = `Bearer ${authToken}`;
 
-  const response = await fetch(`${API_URL}${path}`, {
-    method,
-    headers,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}${path}`, {
+      method,
+      headers,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+  } catch {
+    // fetch solo rechaza cuando no hubo respuesta HTTP.
+    throw new NetworkError();
+  }
 
   if (!response.ok) {
     const data = await response.json().catch(() => null);
@@ -57,6 +78,15 @@ export const apiFetch = async <T>(path: string, { method = 'GET', body, auth = t
 
   return response.json() as Promise<T>;
 };
+
+// Mensaje para el usuario de un error de carga: el del servidor (ApiError) o el de la
+// falta de red (NetworkError, p. ej. "Requiere conexión…"); si no, el texto de respaldo.
+export const errorMessage = (err: unknown, fallback: string): string =>
+  err instanceof ApiError || err instanceof NetworkError ? err.message : fallback;
+
+// Cabecera de idempotencia (opcional) de las escrituras que la PWA puede reintentar.
+export const idempotencyHeaders = (key?: string): Record<string, string> =>
+  key ? { 'Idempotency-Key': key } : {};
 
 // Query string de los listados paginados (?page&limit) con filtros opcionales; los
 // filtros vacíos no se envían (el backend los interpreta como "sin filtro").

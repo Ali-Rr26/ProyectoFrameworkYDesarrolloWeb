@@ -1,9 +1,11 @@
 // src/components/Register.tsx
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { ApiError } from '../services/apiClient';
+import { ApiError, NetworkError } from '../services/apiClient';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { registerUser } from '../services/userService';
 import { isStrongPassword, isValidEmail, PASSWORD_RULES } from '../data/validation';
+import { useDraft } from '../offline/useDraft';
 
 // Errores por campo que devuelve el backend en APIError.details
 type FieldErrors = Partial<Record<'name' | 'email' | 'password' | 'referral_code', string>>;
@@ -14,15 +16,26 @@ const inputClass =
 const Register = () => {
   // El link de invitación es /register?ref=CODIGO: el código llega precargado.
   const [searchParams] = useSearchParams();
-  const [name, setName] = useState<string>('');
-  const [email, setEmail] = useState<string>('');
+  const refFromLink = searchParams.get('ref');
+  // Borrador local de los datos (nunca la contraseña, que vive en su propio estado). Si se
+  // llegó por un link de invitación, el código del link manda sobre el del borrador.
+  const [draft, setDraft, clearDraft] = useDraft(
+    'register',
+    { name: '', email: '', referralCode: refFromLink ?? '' },
+    { exclude: refFromLink ? ['referralCode'] : [] },
+  );
+  const { name, email, referralCode } = draft;
+  const setName = (value: string) => setDraft((prev) => ({ ...prev, name: value }));
+  const setEmail = (value: string) => setDraft((prev) => ({ ...prev, email: value }));
+  const setReferralCode = (value: string) => setDraft((prev) => ({ ...prev, referralCode: value }));
   const [password, setPassword] = useState<string>('');
-  const [referralCode, setReferralCode] = useState<string>(searchParams.get('ref') ?? '');
   const [error, setError] = useState<string>('');
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [loading, setLoading] = useState<boolean>(false);
 
   const navigate = useNavigate();
+  // El registro valida correo y código de referido en el servidor: solo con conexión (D8).
+  const online = useOnlineStatus();
 
   // Aviso temprano en el navegador; el servidor vuelve a validar.
   const emailInvalid = email.trim() !== '' && !isValidEmail(email.trim());
@@ -38,6 +51,7 @@ const Register = () => {
     try {
       const code = referralCode.trim();
       await registerUser({ name, email, password, ...(code ? { referral_code: code } : {}) });
+      await clearDraft();
       // Tras registrarse inicia sesión con su cuenta nueva: el login muestra el aviso.
       navigate('/login', { state: { registeredEmail: email.trim() } });
     } catch (err) {
@@ -45,7 +59,7 @@ const Register = () => {
         setError(err.message);
         if (err.details && typeof err.details === 'object') setFieldErrors(err.details as FieldErrors);
       } else {
-        setError('Error al conectar con el servidor');
+        setError(err instanceof NetworkError ? 'Requiere conexión: necesitas internet para crear tu cuenta' : 'Error al conectar con el servidor');
       }
     } finally {
       setLoading(false);
@@ -117,11 +131,14 @@ const Register = () => {
 
           <button
             type="submit"
-            disabled={loading || !canSubmit}
+            disabled={loading || !canSubmit || !online}
             className="w-full min-h-11 bg-[#20b2aa] text-white font-bold py-3 rounded-lg hover:bg-[#008080] transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Creando cuenta...' : 'Crear cuenta'}
           </button>
+          {!online && (
+            <p className="text-sm text-amber-700 text-center">{'Requiere conexión: necesitas internet para crear tu cuenta. Lo que escribiste queda guardado.'}</p>
+          )}
         </form>
 
         <p className="mt-6 text-center text-sm text-slate-600">

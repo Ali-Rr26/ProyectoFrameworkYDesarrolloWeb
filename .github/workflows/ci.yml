@@ -1,0 +1,70 @@
+# Integración continua: en cada PR y en cada push a main se prueban backend y frontend
+# y se construyen las imágenes de producción. Si termina bien en main, dispara deploy.yml.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Un push nuevo a la misma rama cancela la ejecución anterior.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend (Go)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Backend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: Backend/go.mod
+          cache-dependency-path: Backend/go.sum
+      - name: go vet
+        run: go vet ./...
+      - name: go test
+        run: go test ./...
+
+  frontend:
+    name: Frontend (PWA)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Frontend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Frontend/package-lock.json
+      - run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Pruebas (Vitest)
+        run: npm run test
+      - name: Build (tsc -b + vite build)
+        run: npm run build
+        env:
+          # Solo para compilar: la URL real la pone docker-compose en el despliegue.
+          VITE_API_URL: https://api.example.com
+
+  docker:
+    name: Imágenes Docker
+    needs: [backend, frontend]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Imagen del backend
+        run: docker build -t multicatalogo-api:ci Backend
+      - name: Imagen del frontend
+        run: docker build -t multicatalogo-web:ci --build-arg VITE_API_URL=https://api.example.com Frontend

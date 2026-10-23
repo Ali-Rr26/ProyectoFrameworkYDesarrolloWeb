@@ -1,0 +1,32 @@
+# Las imágenes y acciones usan versiones exactas; Dependabot abre cada mes un PR con las
+# nuevas versiones, que pasa por CI y se despliega al fusionarlo en main.
+version: 2
+updates:
+  # FROM de Backend/Dockerfile y Frontend/Dockerfile.
+  - package-ecosystem: docker
+    directories: ["/Backend", "/Frontend"]
+    schedule:
+      interval: monthly
+    groups:
+      docker-images:
+        patterns: ["*"]
+
+  # image: de deploy/docker-compose.prod.yml y Backend/docker-compose.yml.
+  - package-ecosystem: docker-compose
+    directories: ["/deploy", "/Backend"]
+    schedule:
+      interval: monthly
+    ignore:
+      # Un salto de versión mayor de PostgreSQL exige migrar el volumen (pg_upgrade o
+      # dump/restore): se hace a mano, nunca en un PR automático.
+      - dependency-name: postgres
+        update-types: ["version-update:semver-major"]
+    groups:
+      compose-images:
+        patterns: ["*"]
+
+  # uses: de .github/workflows/.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly

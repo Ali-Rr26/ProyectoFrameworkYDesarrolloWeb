@@ -1,0 +1,13 @@
+# Copiar como deploy/cloudflared/config.yml y reemplazar <TUNNEL_ID> y el dominio.
+# El ID lo imprime `cloudflared tunnel create multicatalogo` (también: `cloudflared tunnel list`).
+tunnel: <TUNNEL_ID>
+credentials-file: /etc/cloudflared/credentials.json
+
+# Ambos dominios van a Caddy (web:80), que separa PWA y API por el Host.
+ingress:
+  - hostname: tudominio.me
+    service: http://web:80
+  - hostname: api.tudominio.me
+    service: http://web:80
+  # Obligatoria: cualquier otro hostname responde 404.
+  - service: http_status:404

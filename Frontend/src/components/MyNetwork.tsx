@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { countNetwork, sumNetworkSales, getMonthlyCommissions, getRank, type NetworkNode } from '../data/network';
 import { getNetwork } from '../services/networkService';
-import { ApiError } from '../services/apiClient';
+import { ApiError, errorMessage } from '../services/apiClient';
 import { COMMISSION_RATES, LEVEL_STYLES } from '../data/constants';
 import InviteLink from './InviteLink';
 import CommissionsPanel from './CommissionsPanel';
@@ -60,7 +60,7 @@ const MyNetwork = () => {
         if (err instanceof ApiError && err.status === 404) {
           setError('Tu cuenta todavía no forma parte de la red de referidos.');
         } else {
-          setError(err instanceof ApiError ? err.message : 'No se pudo cargar la red');
+          setError(errorMessage(err, 'No se pudo cargar la red'));
         }
       })
       .finally(() => setLoading(false));

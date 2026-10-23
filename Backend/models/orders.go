@@ -93,4 +93,7 @@ type OrderFilter struct {
 // UpdateOrderStatusRequest es el cuerpo de PATCH /api/orders/:id/status (solo admin).
 type UpdateOrderStatusRequest struct {
 	Status string `json:"status"`
+	// FromStatus es el estado que el cliente vio (opcional). Si el pedido ya no está en
+	// ese estado, el cambio se rechaza con 409 (otro admin lo cambió mientras tanto).
+	FromStatus string `json:"from_status"`
 }

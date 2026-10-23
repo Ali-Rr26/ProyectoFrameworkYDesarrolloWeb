@@ -141,5 +141,8 @@ func validateProductUpdate(in *models.ProductUpdate) map[string]string {
 		in.Stock == nil && in.Image == nil && in.Gallery == nil && in.Active == nil {
 		errs["body"] = "no se envió ningún campo para modificar"
 	}
+	if in.Version != nil && *in.Version <= 0 {
+		errs["version"] = "debe ser mayor que cero"
+	}
 	return errs
 }

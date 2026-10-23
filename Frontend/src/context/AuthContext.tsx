@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { setAuthToken, setUnauthorizedHandler } from '../services/apiClient';
 import { getMe } from '../services/userService';
+import { requestPersistentStorage } from '../offline/userData';
+import { draftOwner } from '../offline/drafts';
+import { setSnapshotOwner } from '../offline/snapshots';
+import { clearSnapshotUsage } from '../offline/snapshotStatus';
 import { AuthContext, type User } from './auth';
 
 // 1. Sesión completa: usuario + JWT + fecha de expiración del token
@@ -41,22 +45,29 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [session, setSession] = useState<Session | null>(() => {
     const saved = readSession();
     setAuthToken(saved?.token ?? null);
+    // Dueño de las instantáneas offline (datos privados guardados por usuario).
+    setSnapshotOwner(saved ? draftOwner(saved.user.email) : null);
     return saved;
   });
 
   const login = (user: User, token: string, expiresAt: string) => {
     const newSession: Session = { user, token, expiresAt };
     setAuthToken(token);
+    setSnapshotOwner(draftOwner(user.email));
     try {
       sessionStorage.setItem(SESSION_KEY, JSON.stringify(newSession));
     } catch {
       // Sin almacenamiento disponible la sesión dura solo mientras la página esté abierta.
     }
     setSession(newSession);
+    // Que el navegador no borre los datos locales (borradores, pendientes) por falta de espacio.
+    void requestPersistentStorage();
   };
 
   const logout = useCallback(() => {
     setAuthToken(null);
+    setSnapshotOwner(null);
+    clearSnapshotUsage();
     try {
       sessionStorage.removeItem(SESSION_KEY);
     } catch {

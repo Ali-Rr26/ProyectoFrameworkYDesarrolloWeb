@@ -5,6 +5,10 @@ import { useAuth } from "../context/auth";
 import { Menu, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { ICON_SIZES } from '../constants/ui';
 import { ROLE_LABELS } from '../data/constants';
+import { draftOwner } from '../offline/drafts';
+import { clearUserData, countPending } from '../offline/userData';
+import SyncIndicator from './SyncIndicator';
+import { IOS_INSTALL_STEPS, promptInstall, useInstallPrompt } from '../pwa/installPrompt';
 
 interface NavbarProps {
   onMenuClick: () => void;
@@ -18,8 +22,34 @@ const Navbar = ({ onMenuClick, onToggleCollapse, isCollapsed }: NavbarProps) => 
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  // Instalación de la PWA: diálogo del navegador (Chrome/Edge) o instrucciones (iOS).
+  const install = useInstallPrompt();
+  const canInstall = !install.standalone && (install.canPrompt || install.ios);
 
-  const handleLogout = () => {
+  const handleInstall = () => {
+    setIsOpen(false);
+    if (install.canPrompt) {
+      void promptInstall();
+      return;
+    }
+    window.alert(IOS_INSTALL_STEPS);
+  };
+
+  // Cierre de sesión manual: borra borradores y pendientes locales del usuario.
+  // Si quedan registros sin enviar al servidor, se pide confirmación antes de perderlos.
+  const handleLogout = async () => {
+    const owner = draftOwner(user?.email);
+    const pending = await countPending(owner).catch(() => 0);
+    if (
+      pending > 0 &&
+      !window.confirm(
+        `Tienes ${pending} ${pending === 1 ? "registro" : "registros"} sin enviar al servidor. ` +
+          "Si cierras sesión se perderán. ¿Cerrar sesión de todos modos?"
+      )
+    ) {
+      return;
+    }
+    await clearUserData(owner).catch(() => undefined);
     logout();
     navigate("/login");
   };
@@ -65,6 +95,7 @@ const Navbar = ({ onMenuClick, onToggleCollapse, isCollapsed }: NavbarProps) => 
         </h2>
       </div>
       <div className="flex items-center gap-2 sm:gap-6">
+        <SyncIndicator />
         <Link
           to="/cart"
           className="relative p-2 hover:bg-slate-100 rounded-full transition"
@@ -106,9 +137,17 @@ const Navbar = ({ onMenuClick, onToggleCollapse, isCollapsed }: NavbarProps) => 
               />
             </button>
 
-            <div className={`absolute right-0 top-full mt-1 w-36 bg-white border border-slate-200 rounded-lg shadow-lg transition-all duration-200 z-50 ${
+            <div className={`absolute right-0 top-full mt-1 w-44 bg-white border border-slate-200 rounded-lg shadow-lg transition-all duration-200 z-50 ${
               isOpen ? "opacity-100 visible" : "opacity-0 invisible group-hover:opacity-100 group-hover:visible"
             }`}>
+              {canInstall && (
+                <button
+                  onClick={handleInstall}
+                  className="w-full min-h-11 text-left px-4 py-2 text-sm text-[#008080] font-semibold hover:bg-teal-50 rounded-md transition-colors"
+                >
+                  Instalar app
+                </button>
+              )}
               <button
                 onClick={handleLogout}
                 className="w-full min-h-11 text-left px-4 py-2 text-sm text-red-600 font-semibold hover:bg-red-50 rounded-md transition-colors"

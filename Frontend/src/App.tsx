@@ -1,6 +1,7 @@
 import { type ReactNode } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import Layout from './components/Layout';
+import ReloadPrompt from './components/ReloadPrompt';
 import Dashboard from './components/Dashboard';
 import Catalog from './components/Catalog';
 import Storefront from './components/Storefront';
@@ -16,8 +17,10 @@ import AdminProducts from './components/AdminProducts';
 import AdminOrders from './components/AdminOrders';
 import AdminPayouts from './components/AdminPayouts';
 import MyOrders from './components/MyOrders';
+import PendingSync from './components/PendingSync';
 import { CartProvider } from './context/CartContext';
 import { AuthProvider } from './context/AuthContext';
+import { OutboxProvider } from './offline/OutboxProvider';
 import { useAuth } from './context/auth';
 
 // Componente para proteger las rutas privadas: exige estar autenticado
@@ -63,8 +66,12 @@ const CartBoundary = ({ children }: { children: ReactNode }) => {
 function App() {
   return (
     <AuthProvider> {/* Proveedor de Autenticación */}
+      <OutboxProvider> {/* Pendientes guardados sin conexión y su sincronización */}
       <CartBoundary> {/* Proveedor del Carrito (uno por usuario) */}
         <BrowserRouter>
+          {/* Registra el service worker y avisa de versiones nuevas en TODAS las páginas
+              (también login y registro, sin sesión): injectRegister está desactivado. */}
+          <ReloadPrompt />
           <Routes>
             {/* Ruta pública */}
             <Route path="/login" element={<Login />} />
@@ -91,6 +98,7 @@ function App() {
                 <Route path="confirmation" element={<Confirmation />} />
                 <Route path="my-orders" element={<MyOrders />} />
                 <Route path="my-network" element={<MyNetwork />} />
+                <Route path="pending" element={<PendingSync />} />
               </Route>
             </Route>
 
@@ -99,6 +107,7 @@ function App() {
           </Routes>
         </BrowserRouter>
       </CartBoundary>
+      </OutboxProvider>
     </AuthProvider>
   );
 }

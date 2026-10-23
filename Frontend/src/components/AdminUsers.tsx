@@ -5,7 +5,8 @@ import { ROLE_LABELS } from '../data/constants';
 import type { Page } from '../data/orders';
 import type { UpdateUserPayload, UserAccount } from '../data/users';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
-import { ApiError } from '../services/apiClient';
+import { errorMessage } from '../services/apiClient';
+import { useOutbox } from '../offline/outboxContext';
 import { getUsers, updateUser } from '../services/userService';
 import Pagination from './Pagination';
 import SearchInput from './SearchInput';
@@ -15,6 +16,8 @@ const PAGE_SIZE = 10;
 // /admin/users: cuentas paginadas con búsqueda en el servidor (?q=).
 const AdminUsers = () => {
   const { user: currentUser } = useAuth();
+  // Cambiar rol o estado de una cuenta solo con conexión (D8).
+  const { online } = useOutbox();
   const [search, setSearch] = useState<string>('');
   const q = useDebouncedValue(search.trim());
   // La página pertenece a una búsqueda: al cambiar el texto se vuelve a la primera.
@@ -34,7 +37,7 @@ const AdminUsers = () => {
       .then((users) => active && setResult({ key, users }))
       .catch((err) => active && setFailure({
         key,
-        message: err instanceof ApiError ? err.message : 'No se pudo cargar la lista de usuarios',
+        message: errorMessage(err, 'No se pudo cargar la lista de usuarios'),
       }));
     return () => {
       active = false;
@@ -54,7 +57,7 @@ const AdminUsers = () => {
         users: { ...prev.users, data: prev.users.data.map((u) => (u.id === updated.id ? updated : u)) },
       });
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'No se pudo actualizar la cuenta');
+      setError(errorMessage(err, 'No se pudo actualizar la cuenta'));
     } finally {
       setSavingId(null);
     }
@@ -111,7 +114,8 @@ const AdminUsers = () => {
                     <select
                       id={`role-${account.id}`}
                       value={account.role}
-                      disabled={isSelf || busy}
+                      disabled={isSelf || busy || !online}
+                      title={online ? undefined : 'Requiere conexión: esta operación no se puede guardar sin conexión'}
                       onChange={(e) => applyChange(account, { role: e.target.value as Role })}
                       className="min-h-11 px-3 rounded-lg border border-slate-300 bg-white disabled:bg-slate-100 disabled:cursor-not-allowed"
                     >
@@ -122,7 +126,8 @@ const AdminUsers = () => {
 
                     <button
                       type="button"
-                      disabled={isSelf || busy}
+                      disabled={isSelf || busy || !online}
+                      title={online ? undefined : 'Requiere conexión: esta operación no se puede guardar sin conexión'}
                       onClick={() => toggleActive(account)}
                       className={`min-h-11 px-4 rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed ${
                         account.active

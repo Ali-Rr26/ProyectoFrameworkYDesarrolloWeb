@@ -17,6 +17,8 @@ export interface CartContextType {
   incrementQuantity: (id: number) => void;
   decrementQuantity: (id: number) => void;
   clearCart: () => void;
+  // Reemplaza el carrito completo (p. ej. con stock y precios vigentes tras un conflicto)
+  replaceCart: (items: CartItem[]) => void;
   totalItems: number;
   totalPrice: number;
 }

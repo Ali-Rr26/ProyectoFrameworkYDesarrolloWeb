@@ -96,7 +96,7 @@ genérico (decisión anti-enumeración; el análisis sugería 401/403).
 - [x] `PATCH /api/users/:id` (admin): cambiar rol y `active`; invalidar `red:tree:*` afectados; un admin no puede cambiar su propio rol ni desactivarse (`400`) (antes: `PATCH /api/usuarios/:id`)
 
 - [x] Validación de correo estricta (`validEmail`): solo `usuario@dominio.tld`, sin nombre ni `<...>` y con punto en el dominio
-- [x] Contraseña fuerte (`passwordProblems`): 8+ caracteres (máx. 72 bytes), mayúscula, minúscula, número y carácter especial; `details.password` indica qué falta (las cuentas demo conservan `123456`: la regla aplica al registro)
+- [x] Contraseña fuerte (`passwordProblems`): 8+ caracteres (máx. 72 bytes), mayúscula, minúscula, número y carácter especial; `details.password` indica qué falta (la regla aplica al registro; las cuentas demo del seed usan contraseñas que también la cumplen, p. ej. `Admin123#`)
 - [x] Sesión vigente: `RequireAuth` consulta la cuenta (`AccountLookup` → `GetUserByID`) en cada petición autenticada; cuenta desactivada o inexistente → `401`, y el rol y el email salen de la base (un admin degradado pierde el acceso de inmediato)
 - [x] `GET /api/me`: cuenta autenticada con su estado vigente
 

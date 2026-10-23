@@ -17,9 +17,10 @@ import (
 
 // fakeOrderQueries es un OrderQueryRepository en memoria: el pedido 10 es del usuario 7.
 type fakeOrderQueries struct {
-	filter    *models.OrderFilter
-	newStatus string
-	err       error
+	filter     *models.OrderFilter
+	newStatus  string
+	fromStatus string
+	err        error
 }
 
 func (f *fakeOrderQueries) ListOrders(_ context.Context, fl models.OrderFilter) (*models.Page[models.OrderSummary], error) {
@@ -34,8 +35,8 @@ func (f *fakeOrderQueries) GetOrder(_ context.Context, id int) (*models.OrderDet
 	return &models.OrderDetail{OrderSummary: models.OrderSummary{ID: 10, BuyerID: 7}}, nil
 }
 
-func (f *fakeOrderQueries) UpdateOrderStatus(_ context.Context, id int, status string) (*models.OrderDetail, error) {
-	f.newStatus = status
+func (f *fakeOrderQueries) UpdateOrderStatus(_ context.Context, id int, status, fromStatus string) (*models.OrderDetail, error) {
+	f.newStatus, f.fromStatus = status, fromStatus
 	if f.err != nil {
 		return nil, f.err
 	}

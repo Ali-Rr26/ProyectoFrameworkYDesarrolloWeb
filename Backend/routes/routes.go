@@ -21,6 +21,7 @@ type Controllers struct {
 	Reports     *controllers.ReportController
 	Users       *controllers.UserController
 	Health      *controllers.HealthController
+	Idempotency *controllers.Idempotency
 }
 
 // SetupRoutes recibe la aplicación Fiber y los controladores para registrar las rutas.
@@ -47,6 +48,9 @@ func SetupRoutes(app *fiber.App, c Controllers) {
 	// nunca pasen por él, sin depender del orden de registro.
 	auth := c.Auth.RequireAuth
 	adminOnly := c.Auth.RequireRole("admin")
+	// Escrituras que la PWA reintenta desde su outbox: con Idempotency-Key un reenvío
+	// devuelve la respuesta original en lugar de repetir la operación.
+	idem := c.Idempotency.Handle
 
 	// Cuenta autenticada (el frontend valida la sesión al cargar).
 	app.Get("/api/me", auth, c.Login.Me)
@@ -61,8 +65,8 @@ func SetupRoutes(app *fiber.App, c Controllers) {
 	// Compra: el comprador se toma del token. /api/orders se conserva como alias de
 	// /api/checkout para no romper clientes de la Fase 2.
 	app.Get("/api/payment-methods", auth, c.Checkout.GetPaymentMethods)
-	app.Post("/api/checkout", auth, c.Checkout.Checkout)
-	app.Post("/api/orders", auth, c.Checkout.Checkout)
+	app.Post("/api/checkout", auth, idem, c.Checkout.Checkout)
+	app.Post("/api/orders", auth, idem, c.Checkout.Checkout)
 
 	// Pedidos: el cliente ve los suyos; /mine se registra antes que /:id.
 	app.Get("/api/orders/mine", auth, c.Orders.MyOrders)
@@ -78,9 +82,9 @@ func SetupRoutes(app *fiber.App, c Controllers) {
 	app.Get("/api/reports/top-sponsors", auth, adminOnly, c.Reports.TopSponsors)
 	app.Get("/api/reports/pending-commissions", auth, adminOnly, c.Payouts.PendingCommissions)
 	app.Get("/api/orders", auth, adminOnly, c.Orders.ListOrders)
-	app.Patch("/api/orders/:id/status", auth, adminOnly, c.Orders.UpdateStatus)
+	app.Patch("/api/orders/:id/status", auth, adminOnly, idem, c.Orders.UpdateStatus)
 	app.Get("/api/admin/products", auth, adminOnly, c.Products.GetAdminProducts)
-	app.Post("/api/products", auth, adminOnly, c.Products.CreateProduct)
-	app.Put("/api/products/:id", auth, adminOnly, c.Products.UpdateProduct)
+	app.Post("/api/products", auth, adminOnly, idem, c.Products.CreateProduct)
+	app.Put("/api/products/:id", auth, adminOnly, idem, c.Products.UpdateProduct)
 	app.Delete("/api/products/:id", auth, adminOnly, c.Products.DeleteProduct)
 }

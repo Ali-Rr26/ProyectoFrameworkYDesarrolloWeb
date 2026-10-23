@@ -1,6 +1,7 @@
 // src/components/ProductForm.tsx
-import { useState, type FormEvent } from 'react';
+import { type FormEvent } from 'react';
 import type { Product, ProductInput } from '../data/products';
+import { useDraft } from '../offline/useDraft';
 
 // Errores por campo que devuelve el backend en APIError.details
 export type ProductFieldErrors = Record<string, string>;
@@ -11,7 +12,8 @@ interface ProductFormProps {
   categories: string[];
   saving: boolean;
   fieldErrors: ProductFieldErrors;
-  onSubmit: (input: ProductInput) => void;
+  // Resuelve true si el servidor guardó el producto (entonces se borra el borrador).
+  onSubmit: (input: ProductInput) => Promise<boolean>;
   onCancel: () => void;
 }
 
@@ -19,19 +21,46 @@ const inputClass =
   'w-full min-h-11 px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-[#20b2aa] focus:border-[#20b2aa] outline-none transition';
 
 // Formulario de alta/edición de productos (mobile-first: un campo por fila).
-const ProductForm = ({ product, categories, saving, fieldErrors, onSubmit, onCancel }: ProductFormProps) => {
-  const [name, setName] = useState(product?.name ?? '');
-  const [description, setDescription] = useState(product?.description ?? '');
-  const [category, setCategory] = useState(product?.category ?? categories[0] ?? '');
-  const [price, setPrice] = useState(product ? String(product.price) : '');
-  const [stock, setStock] = useState(product ? String(product.stock) : '0');
-  const [image, setImage] = useState(product?.image ?? '');
+// Valores tal como se escriben (texto); se convierten al enviar.
+type ProductFormValues = {
+  name: string;
+  description: string;
+  category: string;
+  price: string;
+  stock: string;
+  image: string;
   // La galería se edita como una URL por línea
-  const [gallery, setGallery] = useState((product?.gallery ?? []).join('\n'));
+  gallery: string;
+};
 
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+const ProductForm = ({ product, categories, saving, fieldErrors, onSubmit, onCancel }: ProductFormProps) => {
+  // Borrador local por producto (o "nuevo"): lo escrito sobrevive a recargas y a la falta de conexión.
+  const [values, setValues, clearDraft] = useDraft<ProductFormValues>(
+    product ? `product:${product.id}` : 'product:new',
+    () => ({
+      name: product?.name ?? '',
+      description: product?.description ?? '',
+      category: product?.category ?? categories[0] ?? '',
+      price: product ? String(product.price) : '',
+      stock: product ? String(product.stock) : '0',
+      image: product?.image ?? '',
+      gallery: (product?.gallery ?? []).join('\n'),
+    }),
+  );
+  const { name, description, category, price, stock, image, gallery } = values;
+  const setField = (field: keyof ProductFormValues) => (value: string) =>
+    setValues((prev) => ({ ...prev, [field]: value }));
+  const setName = setField('name');
+  const setDescription = setField('description');
+  const setCategory = setField('category');
+  const setPrice = setField('price');
+  const setStock = setField('stock');
+  const setImage = setField('image');
+  const setGallery = setField('gallery');
+
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    onSubmit({
+    const saved = await onSubmit({
       name,
       description,
       category,
@@ -40,6 +69,13 @@ const ProductForm = ({ product, categories, saving, fieldErrors, onSubmit, onCan
       image,
       gallery: gallery.split('\n').map((url) => url.trim()).filter(Boolean),
     });
+    if (saved) await clearDraft();
+  };
+
+  // Cancelar descarta el borrador.
+  const handleCancel = () => {
+    void clearDraft();
+    onCancel();
   };
 
   const error = (field: string) =>
@@ -106,7 +142,7 @@ const ProductForm = ({ product, categories, saving, fieldErrors, onSubmit, onCan
           className="min-h-11 px-6 bg-[#20b2aa] text-white font-semibold rounded-lg hover:bg-[#008080] transition disabled:opacity-50">
           {saving ? 'Guardando...' : product ? 'Guardar cambios' : 'Crear producto'}
         </button>
-        <button type="button" onClick={onCancel} disabled={saving}
+        <button type="button" onClick={handleCancel} disabled={saving}
           className="min-h-11 px-6 border border-slate-300 text-slate-700 font-semibold rounded-lg hover:bg-slate-50 transition">
           Cancelar
         </button>

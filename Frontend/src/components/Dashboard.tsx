@@ -14,7 +14,7 @@ import {
 import type { PendingDebt } from '../data/payouts';
 import { addDays, formatDay, todayIn } from '../data/dates';
 import { BUSINESS_TIMEZONE } from '../data/constants';
-import { ApiError } from '../services/apiClient';
+import { ApiError, errorMessage } from '../services/apiClient';
 import { getSummary, getTopProducts, getTopSponsors, type ReportPeriod } from '../services/reportService';
 import { getPendingDebts } from '../services/payoutService';
 
@@ -63,7 +63,7 @@ const Dashboard = () => {
         if (!active) return;
         const message = err instanceof ApiError
           ? (typeof err.details === 'string' ? `${err.message}: ${err.details}` : err.message)
-          : 'No se pudieron cargar los reportes';
+          : errorMessage(err, 'No se pudieron cargar los reportes');
         setFailure({ key, message });
       });
     return () => {

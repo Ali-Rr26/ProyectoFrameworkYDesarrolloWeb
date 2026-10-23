@@ -1,0 +1,76 @@
+# Despliegue continuo: cuando CI termina bien en un push a main (o a mano desde la
+# pestaña Actions, solo sobre main), el servidor actualiza su clon y reconstruye el stack.
+#
+# Corre en un runner self-hosted instalado en el propio servidor: el runner abre una
+# conexión saliente hacia GitHub, así que no hace falta exponer SSH ni puertos (el
+# tráfico web ya entra por Cloudflare Tunnel). Preparación, una sola vez:
+#   1) Settings -> Actions -> Runners -> New self-hosted runner (Linux), con la etiqueta
+#      multicatalogo-prod; instalarlo como servicio (./svc.sh install && ./svc.sh start).
+#      El usuario del runner debe poder usar docker (grupo docker).
+#   2) Clonar el repositorio en el servidor (p. ej. /opt/multicatalogo) con una deploy key
+#      de solo lectura, y crear ahí deploy/.env y deploy/cloudflared/ (fuera de git).
+#   3) Settings -> Environments -> production, y en Variables: DEPLOY_PATH=/opt/multicatalogo.
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+# Nunca dos despliegues a la vez; uno nuevo espera a que termine el anterior.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Desplegar en producción
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: [self-hosted, linux, multicatalogo-prod]
+    environment: production
+    timeout-minutes: 30
+    env:
+      DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+      # Exactamente el commit que pasó CI (o el último de main si es manual).
+      SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - name: Actualizar el código del servidor
+        run: |
+          test -n "$DEPLOY_PATH" || { echo "::error::Definir la variable DEPLOY_PATH del environment production"; exit 1; }
+          cd "$DEPLOY_PATH"
+          git fetch --prune origin
+          # El clon del servidor es un espejo de main: los archivos versionados quedan
+          # como en el commit; .env y cloudflared/ (ignorados) no se tocan.
+          git reset --hard "$SHA"
+
+      - name: Construir y levantar el stack
+        working-directory: ${{ vars.DEPLOY_PATH }}/deploy
+        # --wait: falla si un servicio no llega a sano (la API aplica las migraciones al arrancar).
+        run: docker compose -f docker-compose.prod.yml up -d --build --remove-orphans --wait --wait-timeout 300
+
+      - name: Comprobar la API y la PWA por HTTPS
+        working-directory: ${{ vars.DEPLOY_PATH }}/deploy
+        run: |
+          domain=$(grep -E '^DOMAIN=' .env | cut -d= -f2-)
+          api=$(grep -E '^API_DOMAIN=' .env | cut -d= -f2-)
+          for attempt in $(seq 1 12); do
+            if curl -fsS "https://$api/api/health" && curl -fsS -o /dev/null "https://$domain/"; then
+              echo; echo "Despliegue OK: https://$domain"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::La API o la PWA no responden por HTTPS"
+          docker compose -f docker-compose.prod.yml ps
+          docker compose -f docker-compose.prod.yml logs --tail 50 backend web cloudflared
+          exit 1
+
+      - name: Borrar imágenes sin uso
+        run: docker image prune -f
