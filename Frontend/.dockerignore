@@ -1,0 +1,7 @@
+# La imagen instala sus propias dependencias y genera su propio dist.
+node_modules
+dist
+dev-dist
+.env
+*.local
+.git

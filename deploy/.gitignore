@@ -1,0 +1,4 @@
+.env
+# Configuración real y secreto del túnel (se versiona solo config.yml.example).
+cloudflared/config.yml
+cloudflared/credentials.json
