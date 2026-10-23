@@ -8,6 +8,7 @@ import { ROLE_LABELS } from '../data/constants';
 import { draftOwner } from '../offline/drafts';
 import { clearUserData, countPending } from '../offline/userData';
 import SyncIndicator from './SyncIndicator';
+import { promptInstall, useInstallPrompt } from '../pwa/installPrompt';
 
 interface NavbarProps {
   onMenuClick: () => void;
@@ -21,6 +22,18 @@ const Navbar = ({ onMenuClick, onToggleCollapse, isCollapsed }: NavbarProps) => 
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  // Instalación de la PWA: diálogo del navegador (Chrome/Edge) o instrucciones (iOS).
+  const install = useInstallPrompt();
+  const canInstall = !install.standalone && (install.canPrompt || install.ios);
+
+  const handleInstall = () => {
+    setIsOpen(false);
+    if (install.canPrompt) {
+      void promptInstall();
+      return;
+    }
+    window.alert('Para instalar MultiCatálogo en tu iPhone o iPad: toca Compartir y luego "Agregar a pantalla de inicio".');
+  };
 
   // Cierre de sesión manual: borra borradores y pendientes locales del usuario.
   // Si quedan registros sin enviar al servidor, se pide confirmación antes de perderlos.
@@ -124,9 +137,17 @@ const Navbar = ({ onMenuClick, onToggleCollapse, isCollapsed }: NavbarProps) => 
               />
             </button>
 
-            <div className={`absolute right-0 top-full mt-1 w-36 bg-white border border-slate-200 rounded-lg shadow-lg transition-all duration-200 z-50 ${
+            <div className={`absolute right-0 top-full mt-1 w-44 bg-white border border-slate-200 rounded-lg shadow-lg transition-all duration-200 z-50 ${
               isOpen ? "opacity-100 visible" : "opacity-0 invisible group-hover:opacity-100 group-hover:visible"
             }`}>
+              {canInstall && (
+                <button
+                  onClick={handleInstall}
+                  className="w-full min-h-11 text-left px-4 py-2 text-sm text-[#008080] font-semibold hover:bg-teal-50 rounded-md transition-colors"
+                >
+                  Instalar app
+                </button>
+              )}
               <button
                 onClick={handleLogout}
                 className="w-full min-h-11 text-left px-4 py-2 text-sm text-red-600 font-semibold hover:bg-red-50 rounded-md transition-colors"

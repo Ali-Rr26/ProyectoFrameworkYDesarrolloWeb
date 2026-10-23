@@ -1,6 +1,7 @@
 import { type ReactNode } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import Layout from './components/Layout';
+import ReloadPrompt from './components/ReloadPrompt';
 import Dashboard from './components/Dashboard';
 import Catalog from './components/Catalog';
 import Storefront from './components/Storefront';
@@ -68,6 +69,9 @@ function App() {
       <OutboxProvider> {/* Pendientes guardados sin conexión y su sincronización */}
       <CartBoundary> {/* Proveedor del Carrito (uno por usuario) */}
         <BrowserRouter>
+          {/* Registra el service worker y avisa de versiones nuevas en TODAS las páginas
+              (también login y registro, sin sesión): injectRegister está desactivado. */}
+          <ReloadPrompt />
           <Routes>
             {/* Ruta pública */}
             <Route path="/login" element={<Login />} />

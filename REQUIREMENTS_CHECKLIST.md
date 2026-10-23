@@ -169,7 +169,8 @@ React SPA (:5173) ──► Caddy/Nginx (U4: proxy inverso + SSL)
 - [ ] Pruebas (`npm run test`) y verificación offline en navegador
 
 ## PWA-F9 · Experiencia offline, actualizaciones e instalación
-- [ ] `useOnlineStatus` + banner, login/registro "Requiere conexión", `ReloadPrompt`, `useInstallPrompt`, `safe-area-inset`, prueba offline → online sin pedidos duplicados
+- [x] `useOnlineStatus` + franja de conexión, login/registro "Requiere conexión", `ReloadPrompt` ("Nueva versión disponible", pospuesto en `/checkout` y durante la sincronización), "Instalar app" (`beforeinstallprompt` + instrucciones iOS), `viewport-fit=cover` y `safe-area-inset`
+- [ ] Pruebas (`npm run test`), verificación a 360px y prueba completa offline → online sin pedidos duplicados
 
 ## PWA-F10 · HTTPS y validación final (depende de U4)
 - [ ] HTTPS mismo dominio, cabeceras de caché, imágenes con CORS, Lighthouse ≥ 90, pruebas en Android/escritorio/iOS, `PROJECT_MAP.md`

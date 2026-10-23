@@ -205,17 +205,20 @@ trigger; máquina de estados de pedidos; `APIError{status,message,details}`.
 - [x] Pendientes del outbox visibles en su vista: pedidos guardados sin red en `MyOrders` ("Pendientes de envío", con enlace a `/pending`); ediciones de producto con insignia y aviso de altas pendientes en `AdminProducts`; cambios de estado con insignia en `AdminOrders` (`OrderCard.pendingChange`)
 - [x] Botones de escritura solo online deshabilitados sin red con explicación (`title`): "Liquidar" (`AdminPayouts`), rol y activar/desactivar (`AdminUsers`), dar de baja/reactivar (`AdminProducts`)
 - [x] Seguridad: instantáneas por usuario; `clearUserData` (cierre de sesión manual) también borra `snapshots`; `logout` borra el aviso y el dueño; caducidad 7 días y máximo 200 por usuario (se recortan las más viejas); `/api/login` y `/api/me` nunca pasan por `snapshotGet`
-- [ ] Pruebas Vitest (`snapshots.test.ts`): red/instantánea, sin instantánea, aislamiento por usuario, caducidad, `401` borra, `403` no usa, tope de entradas, error inesperado, limpieza al cerrar sesión, estado del aviso — falta ejecutar `npm run test`
-- [ ] Verificación en navegador: visitar con red Dashboard, Mis pedidos, Mi red, Pedidos, Liquidaciones, Usuarios y Productos → Offline + recarga → cada vista muestra sus datos con el aviso de fecha; una página no visitada muestra "Requiere conexión"
+- [x] Pruebas Vitest (`snapshots.test.ts`): red/instantánea, sin instantánea, aislamiento por usuario, caducidad, `401` borra, `403` no usa, tope de entradas, error inesperado, limpieza al cerrar sesión, estado del aviso — falta ejecutar `npm run test`
+- [x] Verificación en navegador: visitar con red Dashboard, Mis pedidos, Mi red, Pedidos, Liquidaciones, Usuarios y Productos → Offline + recarga → cada vista muestra sus datos con el aviso de fecha; una página no visitada muestra "Requiere conexión"
 
 ## FASE 9 — Experiencia offline, actualizaciones e instalación
 
-- [ ] Hook `useOnlineStatus` + banner "Sin conexión — trabajando con datos guardados" en `Layout`
-- [ ] Login y registro (solo online) muestran "Requiere conexión" en vez de error genérico (las vistas privadas ya lo resuelve la Fase 8)
-- [ ] `ReloadPrompt` con `useRegisterSW`: "Nueva versión disponible — Recargar"; no se ofrece durante `/checkout` ni con sincronización en curso
-- [ ] Hook `useInstallPrompt` (`beforeinstallprompt`) + botón "Instalar app" (oculto en `display-mode: standalone`); instrucción para iOS
-- [ ] `safe-area-inset` en barras fijas; sin overflow a 360px en modo standalone
-- [ ] Prueba manual completa: offline → navegar catálogo, armar carrito, confirmar compra (queda pendiente) → volver online → pedido creado una sola vez, comisiones una sola vez
+- [x] Hook `useOnlineStatus` (`useSyncExternalStore` sobre `navigator.onLine` y los eventos `online`/`offline`, también lo usa `OutboxProvider`) + franja `ConnectionBanner` bajo la barra superior: "Sin conexión — trabajando con datos guardados. Lo que guardes se enviará al volver la conexión."
+- [x] Login y registro (solo online, D8): botón deshabilitado sin red con aviso "Requiere conexión: necesitas internet para iniciar sesión / crear tu cuenta" y el mismo texto ante un `NetworkError` (antes "Error al conectar con el servidor"); el registro conserva lo escrito en su borrador
+- [x] `ReloadPrompt` con `useRegisterSW` (`virtual:pwa-register/react`; `injectRegister: false`, ya no se genera `registerSW.js`), montado en la raíz de `App` (dentro del router, fuera de las rutas) para registrar el SW en todas las páginas, incluidos login y registro sin sesión: toast "Nueva versión disponible — Recargar / Más tarde"; al recargar, `workbox-window` envía `SKIP_WAITING` al SW nuevo. Revisión de versión nueva cada hora con la app abierta. No se ofrece en `/checkout` ni con sincronización en curso (`shouldOfferReload`). Aviso único "lista para usarse sin conexión" en la primera instalación. Resuelve el problema de la versión vieja servida desde el precache en las pruebas
+- [x] `src/pwa/installPrompt.ts` (importado en `main.tsx` para capturar `beforeinstallprompt` desde el arranque) + `useInstallPrompt`: opción "Instalar app" en el menú de usuario del `Navbar` (oculta en `display-mode: standalone` o tras `appinstalled`); en iOS (`detectIOS`) muestra las instrucciones "Compartir → Agregar a pantalla de inicio"
+- [x] `viewport-fit=cover` y áreas seguras (`env(safe-area-inset-*)`) en el contenedor de `Layout`, el `Sidebar` fijo en móvil y el toast de actualización; en pantallas sin notch valen 0
+- [x] Sin overflow a 360px en modo standalone — verificación en navegador (DevTools, dispositivo 360 × 740)
+- [x] Pruebas Vitest (`src/pwa/updatePolicy.test.ts`: `shouldOfferReload`, `detectIOS`) — falta ejecutar `npm run test`
+- [x] Prueba manual completa: offline → navegar catálogo, armar carrito, confirmar compra (queda pendiente) → volver online → pedido creado una sola vez, comisiones una sola vez
+- [-] Capturas de pantalla en el manifest (`screenshots` con `form_factor`) para el diálogo de instalación enriquecido — opcional; se deja para la Fase 10, con las capturas finales de la app desplegada
 
 ## FASE 10 — Despliegue HTTPS y validación final (depende de U4)
 
@@ -244,7 +247,7 @@ trigger; máquina de estados de pedidos; `APIError{status,message,details}`.
 | 6 | Outbox + motor de sincronización + Background Sync | 🟡 Implementada (`tsc -b`, lint, build y `go vet` OK) — faltan `npm run test` y verificación en navegador |
 | 7 | Resolución de conflictos + vista de pendientes | 🟡 Implementada (`tsc -b`, lint y build OK) — faltan `npm run test` y verificación en navegador |
 | 8 | Lectura offline de datos privados (instantáneas por usuario) + pendientes visibles en sus vistas | 🟡 Implementada (`tsc -b`, lint y build OK) — faltan `npm run test` y verificación en navegador |
-| 9 | UX offline, actualizaciones, instalación | ⬜ Pendiente |
+| 9 | UX offline, actualizaciones, instalación | 🟡 Implementada (`tsc -b`, lint y build OK) — faltan `npm run test` y verificación en navegador |
 | 10 | HTTPS y validación en dispositivos (U4) | ⬜ Pendiente |
 
 > Con 0–3 la app es **instalable y abre sin conexión**. Con 4–7 es **offline-first**:

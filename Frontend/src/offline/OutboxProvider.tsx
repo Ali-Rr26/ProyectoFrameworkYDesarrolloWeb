@@ -8,6 +8,7 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useAuth } from '../context/auth';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { draftOwner } from './drafts';
 import { isOffline, OUTBOX_CHANGED, userOutbox } from './outbox';
 import { SYNC_OUTBOX_MESSAGE } from './syncMessages';
@@ -36,7 +37,7 @@ export const OutboxProvider = ({ children }: { children: ReactNode }) => {
   ) ?? NO_ENTRIES;
 
   const [syncing, setSyncing] = useState<boolean>(false);
-  const [online, setOnline] = useState<boolean>(() => !isOffline());
+  const online = useOnlineStatus();
   const [lastReport, setLastReport] = useState<SyncReport | null>(null);
 
   const syncNow = useCallback(async () => {
@@ -67,22 +68,16 @@ export const OutboxProvider = ({ children }: { children: ReactNode }) => {
 
   // Conexión, pendientes nuevos y Background Sync.
   useEffect(() => {
-    const onOnline = () => {
-      setOnline(true);
-      void syncNow();
-    };
-    const onOffline = () => setOnline(false);
+    const onOnline = () => void syncNow();
     const onChanged = () => void syncNow();
     const onMessage = (event: MessageEvent) => {
       if (event.data?.type === SYNC_OUTBOX_MESSAGE) void syncNow();
     };
     window.addEventListener('online', onOnline);
-    window.addEventListener('offline', onOffline);
     window.addEventListener(OUTBOX_CHANGED, onChanged);
     navigator.serviceWorker?.addEventListener('message', onMessage);
     return () => {
       window.removeEventListener('online', onOnline);
-      window.removeEventListener('offline', onOffline);
       window.removeEventListener(OUTBOX_CHANGED, onChanged);
       navigator.serviceWorker?.removeEventListener('message', onMessage);
     };

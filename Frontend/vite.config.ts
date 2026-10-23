@@ -16,7 +16,8 @@ export default defineConfig({
       srcDir: 'src',
       filename: 'sw.ts',
       registerType: 'prompt',
-      injectRegister: 'auto',
+      // El SW lo registra ReloadPrompt (virtual:pwa-register/react) para avisar de versiones nuevas.
+      injectRegister: false,
       manifest: {
         id: PWA_IDENTITY.startUrl,
         name: PWA_IDENTITY.name,

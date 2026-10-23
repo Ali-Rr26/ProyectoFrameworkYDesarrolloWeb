@@ -3,6 +3,7 @@ import { useState } from "react";
 import Sidebar from "./Sidebar";
 import Navbar from "./Navbar";
 import OfflineDataBanner from "./OfflineDataBanner";
+import ConnectionBanner from "./ConnectionBanner";
 
 const Layout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -12,7 +13,8 @@ const Layout = () => {
 
   // h-dvh: alto real de la pantalla (en móvil descuenta la barra del navegador, a diferencia de 100vh).
   return (
-    <div className="flex h-dvh bg-slate-50">
+    // Áreas seguras (notch, barra de gestos) en modo standalone; en el resto valen 0.
+    <div className="flex h-dvh bg-slate-50 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
       <Sidebar
         isOpen={sidebarOpen}
         isCollapsed={isCollapsed}
@@ -26,6 +28,7 @@ const Layout = () => {
           onToggleCollapse={() => setIsCollapsed(!isCollapsed)}
           isCollapsed={isCollapsed}
         />
+        <ConnectionBanner />
 
         {/* relative: los elementos absolutos de las páginas (p. ej. etiquetas sr-only) se ubican y
             recortan dentro de esta área con scroll; sin él escapan a la página y crean una segunda
