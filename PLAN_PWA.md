@@ -214,6 +214,7 @@ trigger; máquina de estados de pedidos; `APIError{status,message,details}`.
 - [x] Login y registro (solo online, D8): botón deshabilitado sin red con aviso "Requiere conexión: necesitas internet para iniciar sesión / crear tu cuenta" y el mismo texto ante un `NetworkError` (antes "Error al conectar con el servidor"); el registro conserva lo escrito en su borrador
 - [x] `ReloadPrompt` con `useRegisterSW` (`virtual:pwa-register/react`; `injectRegister: false`, ya no se genera `registerSW.js`), montado en la raíz de `App` (dentro del router, fuera de las rutas) para registrar el SW en todas las páginas, incluidos login y registro sin sesión: toast "Nueva versión disponible — Recargar / Más tarde"; al recargar, `workbox-window` envía `SKIP_WAITING` al SW nuevo. Revisión de versión nueva cada hora con la app abierta. No se ofrece en `/checkout` ni con sincronización en curso (`shouldOfferReload`). Aviso único "lista para usarse sin conexión" en la primera instalación. Resuelve el problema de la versión vieja servida desde el precache en las pruebas
 - [x] `src/pwa/installPrompt.ts` (importado en `main.tsx` para capturar `beforeinstallprompt` desde el arranque) + `useInstallPrompt`: opción "Instalar app" en el menú de usuario del `Navbar` (oculta en `display-mode: standalone` o tras `appinstalled`); en iOS (`detectIOS`) muestra las instrucciones "Compartir → Agregar a pantalla de inicio"
+- [x] Botón "Instalar app" también en `/login` (`InstallAppButton`, reutilizable): paleta de la app (borde y texto turquesa, relleno al pasar el mouse), ancho completo en móvil y automático desde `sm`, altura táctil ≥44px; en iOS despliega los pasos en línea en lugar de un `alert`. Oculto si la app ya está instalada o el navegador no permite instalarla
 - [x] `viewport-fit=cover` y áreas seguras (`env(safe-area-inset-*)`) en el contenedor de `Layout`, el `Sidebar` fijo en móvil y el toast de actualización; en pantallas sin notch valen 0
 - [x] Sin overflow a 360px en modo standalone — verificación en navegador (DevTools, dispositivo 360 × 740)
 - [x] Pruebas Vitest (`src/pwa/updatePolicy.test.ts`: `shouldOfferReload`, `detectIOS`) — falta ejecutar `npm run test`
@@ -224,13 +225,14 @@ trigger; máquina de estados de pedidos; `APIError{status,message,details}`.
 
 > El SW funciona en `localhost`; en producción exige HTTPS.
 
-- [ ] Frontend y API por HTTPS tras Caddy/Nginx; idealmente mismo dominio (`/api`) — simplifica reglas del SW y elimina CORS
-- [ ] `CORS_ORIGIN` con el dominio final si se mantiene origen separado
-- [ ] Cabeceras: `sw.js`, `index.html` y `manifest.webmanifest` con `Cache-Control: no-cache`; assets con hash `immutable`
-- [ ] Imágenes servidas desde origen propio/CDN con CORS (adiós respuestas opacas)
-- [ ] Lighthouse móvil: instalable ✔; Performance/Accessibility/Best Practices ≥ 90
-- [ ] Prueba real en Android (Chrome, incluye Background Sync), escritorio, iOS Safari (sin Background Sync: sincroniza al abrir la app)
-- [ ] `PROJECT_MAP.md` actualizado: SW, Dexie, outbox, middleware de idempotencia, migración `0006`
+- [x] Frontend y API por HTTPS tras **Caddy** (`deploy/Caddyfile`, certificados de Let's Encrypt automáticos, HTTP → HTTPS, HSTS) en `deploy/docker-compose.prod.yml`: PostgreSQL + Redis + API + Caddy, solo Caddy publica 80/443; imagen del frontend en `Frontend/Dockerfile` (build de Vite → Caddy). **Decisión:** la API va en su propio subdominio (`API_DOMAIN`) en lugar de `/api` en el mismo dominio; las reglas del SW ya derivan el origen de `VITE_API_URL`, así que funcionan igual
+- [x] `CORS_ORIGIN=https://${DOMAIN}` en el backend de producción; `VITE_API_URL=https://${API_DOMAIN}` como `build.arg` del frontend; CORS ya permite `Idempotency-Key` e `If-Match` y expone `Idempotent-Replayed` (Fase 5)
+- [x] Cabeceras: `Cache-Control: no-cache` para todo salvo `/assets/*` (incluye `sw.js`, `manifest.webmanifest`, íconos e `index.html` también cuando se sirve para una ruta de la SPA — antes solo `/` y `/index.html`); `/assets/*` con `public, max-age=31536000, immutable` y **404** si el asset no existe (antes devolvía `index.html` con 200 a un `.js` de una versión vieja); `X-Content-Type-Options: nosniff` y `Referrer-Policy`
+- [ ] Imágenes servidas desde origen propio/CDN con CORS — pendiente: las imágenes del seed y las URLs que carga el admin son externas (picsum…); requiere almacenamiento propio de imágenes (subida al backend o bucket), fuera del alcance de la PWA. Mientras tanto, el límite de 60 entradas del SW acota la cuota de las respuestas opacas
+- [ ] Lighthouse móvil: instalable ✔; Performance/Accessibility/Best Practices ≥ 90 — tras desplegar (DevTools → Lighthouse → Mobile sobre `https://DOMAIN`)
+- [ ] Prueba real en Android (Chrome, incluye Background Sync), escritorio, iOS Safari (sin Background Sync: sincroniza al abrir la app) — tras desplegar
+- [x] `PROJECT_MAP.md` actualizado: sección "PWA offline-first" (SW, Dexie, outbox, motor, conflictos, instantáneas, componentes), middleware de idempotencia, migración `0006`, contratos de sincronización y despliegue `deploy/`
+- [ ] (Opcional) `screenshots` en el manifest (`form_factor: wide` y `narrow`) para el diálogo de instalación enriquecido, con capturas de la app desplegada
 
 ---
 
@@ -248,7 +250,7 @@ trigger; máquina de estados de pedidos; `APIError{status,message,details}`.
 | 7 | Resolución de conflictos + vista de pendientes | 🟡 Implementada (`tsc -b`, lint y build OK) — faltan `npm run test` y verificación en navegador |
 | 8 | Lectura offline de datos privados (instantáneas por usuario) + pendientes visibles en sus vistas | 🟡 Implementada (`tsc -b`, lint y build OK) — faltan `npm run test` y verificación en navegador |
 | 9 | UX offline, actualizaciones, instalación | 🟡 Implementada (`tsc -b`, lint y build OK) — faltan `npm run test` y verificación en navegador |
-| 10 | HTTPS y validación en dispositivos (U4) | ⬜ Pendiente |
+| 10 | HTTPS y validación en dispositivos (U4) | 🟡 Configuración lista (Caddy + HTTPS + cabeceras + compose de producción + `PROJECT_MAP.md`) — faltan desplegar, Lighthouse, dispositivos reales e imágenes propias |
 
 > Con 0–3 la app es **instalable y abre sin conexión**. Con 4–7 es **offline-first**:
 > consulta, captura y sincroniza sin duplicar pedidos. Con 8 todas las vistas privadas
