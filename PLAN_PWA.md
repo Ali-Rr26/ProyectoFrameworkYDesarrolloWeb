@@ -225,12 +225,15 @@ trigger; máquina de estados de pedidos; `APIError{status,message,details}`.
 
 > El SW funciona en `localhost`; en producción exige HTTPS.
 
-- [x] Frontend y API por HTTPS tras **Caddy** (`deploy/Caddyfile`, certificados de Let's Encrypt automáticos, HTTP → HTTPS, HSTS) en `deploy/docker-compose.prod.yml`: PostgreSQL + Redis + API + Caddy, solo Caddy publica 80/443; imagen del frontend en `Frontend/Dockerfile` (build de Vite → Caddy). **Decisión:** la API va en su propio subdominio (`API_DOMAIN`) en lugar de `/api` en el mismo dominio; las reglas del SW ya derivan el origen de `VITE_API_URL`, así que funcionan igual
+- [x] Frontend y API por HTTPS con **Cloudflare Tunnel** (`cloudflared`: conexión saliente, Cloudflare pone el certificado) hacia **Caddy** (`deploy/Caddyfile`, HTTP interno, separa PWA y API por el `Host`, HSTS) en `deploy/docker-compose.prod.yml`: PostgreSQL + Redis + API + Caddy + `cloudflared`, ningún servicio publica puertos; imagen del frontend en `Frontend/Dockerfile` (build de Vite → Caddy). **Decisión:** la API va en su propio subdominio (`API_DOMAIN`) en lugar de `/api` en el mismo dominio; las reglas del SW ya derivan el origen de `VITE_API_URL`, así que funcionan igual
 - [x] `CORS_ORIGIN=https://${DOMAIN}` en el backend de producción; `VITE_API_URL=https://${API_DOMAIN}` como `build.arg` del frontend; CORS ya permite `Idempotency-Key` e `If-Match` y expone `Idempotent-Replayed` (Fase 5)
 - [x] Cabeceras: `Cache-Control: no-cache` para todo salvo `/assets/*` (incluye `sw.js`, `manifest.webmanifest`, íconos e `index.html` también cuando se sirve para una ruta de la SPA — antes solo `/` y `/index.html`); `/assets/*` con `public, max-age=31536000, immutable` y **404** si el asset no existe (antes devolvía `index.html` con 200 a un `.js` de una versión vieja); `X-Content-Type-Options: nosniff` y `Referrer-Policy`
 - [ ] Imágenes servidas desde origen propio/CDN con CORS — pendiente: las imágenes del seed y las URLs que carga el admin son externas (picsum…); requiere almacenamiento propio de imágenes (subida al backend o bucket), fuera del alcance de la PWA. Mientras tanto, el límite de 60 entradas del SW acota la cuota de las respuestas opacas
 - [ ] Lighthouse móvil: instalable ✔; Performance/Accessibility/Best Practices ≥ 90 — tras desplegar (DevTools → Lighthouse → Mobile sobre `https://DOMAIN`)
 - [ ] Prueba real en Android (Chrome, incluye Background Sync), escritorio, iOS Safari (sin Background Sync: sincroniza al abrir la app) — tras desplegar
+- [x] Imágenes Docker con versión exacta en `deploy/docker-compose.prod.yml`, `Backend/docker-compose.yml` y ambos Dockerfile (antes `latest`, `redis:alpine`, `2-alpine`…); `.github/dependabot.yml` propone las actualizaciones (Docker, Docker Compose y GitHub Actions) cada mes como PR que pasa por CI
+- [x] CI/CD con GitHub Actions: `ci.yml` (backend `go vet` + `go test`, frontend lint + Vitest + build, build de las imágenes Docker) en PR y push a `main`; `deploy.yml` tras CI verde en `main` (o manual) en un runner self-hosted del servidor: actualiza el clon, `docker compose up -d --build --wait` y comprueba `/api/health` y la PWA por HTTPS
+- [x] Login sin el cuadro de "Cuentas de prueba"; el seed da a cada usuario demo una contraseña fuerte (`Admin123#`, `Cliente123#`…), que se cambia en producción tras el primer despliegue
 - [x] `PROJECT_MAP.md` actualizado: sección "PWA offline-first" (SW, Dexie, outbox, motor, conflictos, instantáneas, componentes), middleware de idempotencia, migración `0006`, contratos de sincronización y despliegue `deploy/`
 - [ ] (Opcional) `screenshots` en el manifest (`form_factor: wide` y `narrow`) para el diálogo de instalación enriquecido, con capturas de la app desplegada
 
@@ -250,7 +253,7 @@ trigger; máquina de estados de pedidos; `APIError{status,message,details}`.
 | 7 | Resolución de conflictos + vista de pendientes | 🟡 Implementada (`tsc -b`, lint y build OK) — faltan `npm run test` y verificación en navegador |
 | 8 | Lectura offline de datos privados (instantáneas por usuario) + pendientes visibles en sus vistas | 🟡 Implementada (`tsc -b`, lint y build OK) — faltan `npm run test` y verificación en navegador |
 | 9 | UX offline, actualizaciones, instalación | 🟡 Implementada (`tsc -b`, lint y build OK) — faltan `npm run test` y verificación en navegador |
-| 10 | HTTPS y validación en dispositivos (U4) | 🟡 Configuración lista (Caddy + HTTPS + cabeceras + compose de producción + `PROJECT_MAP.md`) — faltan desplegar, Lighthouse, dispositivos reales e imágenes propias |
+| 10 | HTTPS y validación en dispositivos (U4) | 🟡 Configuración lista (Cloudflare Tunnel + Caddy + cabeceras + compose de producción con versiones fijas + CI/CD + `PROJECT_MAP.md`) — faltan desplegar, Lighthouse, dispositivos reales e imágenes propias |
 
 > Con 0–3 la app es **instalable y abre sin conexión**. Con 4–7 es **offline-first**:
 > consulta, captura y sincroniza sin duplicar pedidos. Con 8 todas las vistas privadas

@@ -173,5 +173,6 @@ React SPA (:5173) ──► Caddy/Nginx (U4: proxy inverso + SSL)
 - [ ] Pruebas (`npm run test`), verificación a 360px y prueba completa offline → online sin pedidos duplicados
 
 ## PWA-F10 · HTTPS y validación final (depende de U4)
-- [x] Despliegue con Caddy + HTTPS automático (`deploy/`), API en subdominio con `CORS_ORIGIN` y `VITE_API_URL` de producción, cabeceras `no-cache`/`immutable` (404 en assets inexistentes), `PROJECT_MAP.md`
+- [x] Despliegue con Cloudflare Tunnel + Caddy (`deploy/`), API en subdominio con `CORS_ORIGIN` y `VITE_API_URL` de producción, cabeceras `no-cache`/`immutable` (404 en assets inexistentes), imágenes Docker con versión fija + Dependabot, `PROJECT_MAP.md`
+- [x] CI/CD con GitHub Actions (`ci.yml`: pruebas, lint y build; `deploy.yml`: despliegue en runner self-hosted tras CI verde en `main`); login sin credenciales visibles y contraseñas fuertes en el seed
 - [ ] Desplegar en el servidor, Lighthouse ≥ 90, pruebas en Android/escritorio/iOS, imágenes en origen propio con CORS

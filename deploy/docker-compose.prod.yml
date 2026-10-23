@@ -3,9 +3,11 @@
 #   docker compose -f docker-compose.prod.yml up -d --build
 # Ningún servicio publica puertos: cloudflared abre una conexión de salida hacia
 # Cloudflare, que pone el HTTPS y reenvía el tráfico a Caddy (web:80).
+# Imágenes con versión exacta: cada despliegue usa las mismas; Dependabot propone las
+# actualizaciones como PR (.github/dependabot.yml) y pasan por CI antes de llegar aquí.
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:16.15-alpine
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-multicatalogo}
@@ -20,7 +22,7 @@ services:
       retries: 10
 
   redis:
-    image: redis:alpine
+    image: redis:8.10.2-alpine
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -69,7 +71,7 @@ services:
   # deploy/cloudflared/ contiene config.yml (rutas dominio -> http://web:80) y
   # credentials.json (secreto del túnel); ambos fuera de git.
   cloudflared:
-    image: cloudflare/cloudflared:latest
+    image: cloudflare/cloudflared:2026.10.3
     restart: unless-stopped
     command: tunnel --no-autoupdate --config /etc/cloudflared/config.yml run
     volumes:

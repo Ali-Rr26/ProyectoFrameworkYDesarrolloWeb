@@ -4,7 +4,7 @@
 #   docker compose up -d postgres redis     -> solo infraestructura, para trabajar con `go run .`
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:16.15-alpine
     container_name: multicatalogo-db
     restart: unless-stopped
     environment:
@@ -24,7 +24,7 @@ services:
       retries: 10
 
   redis:
-    image: redis:alpine
+    image: redis:8.10.2-alpine
     container_name: multicatalogo-cache
     restart: unless-stopped
     ports:
