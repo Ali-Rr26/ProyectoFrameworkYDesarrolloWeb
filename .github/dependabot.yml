@@ -7,6 +7,11 @@ updates:
     directories: ["/Backend", "/Frontend"]
     schedule:
       interval: monthly
+    ignore:
+      # Node se queda en la línea LTS que usa CI (setup-node 22): un salto de versión
+      # mayor se hace a mano, cambiando también .github/workflows/ci.yml.
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]
     groups:
       docker-images:
         patterns: ["*"]
