@@ -2,8 +2,22 @@
 // solo cuando cambian los datos) y la red refresca esa copia en segundo plano.
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useState } from 'react';
-import { refreshCatalog, refreshProduct } from './catalogStore';
+import { CATALOG_SYNCED_AT, refreshCatalog, refreshProduct } from './catalogStore';
 import { db, type LocalProduct } from './db';
+import { isOffline } from './outbox';
+import { markSnapshotFresh, markSnapshotUsed } from './snapshotStatus';
+
+// Clave del catálogo en el aviso "datos guardados el {fecha}" (OfflineDataBanner), el
+// mismo que usan las vistas privadas.
+const CATALOG_USAGE_KEY = 'catalog';
+
+// Sin red, avisa desde cuándo es la copia local (si la hay).
+const showCatalogSavedAt = async () => {
+  const synced = await db.meta.get(CATALOG_SYNCED_AT).catch(() => undefined);
+  if (typeof synced?.value === 'string' && (await db.products.count()) > 0) {
+    markSnapshotUsed(CATALOG_USAGE_KEY, synced.value);
+  }
+};
 
 interface CatalogState {
   products: LocalProduct[];
@@ -22,8 +36,20 @@ export const useCatalog = (): CatalogState => {
   useEffect(() => {
     let active = true;
     const refresh = () => {
-      refreshCatalog()
-        .then(() => active && setFailed(false), () => active && setFailed(true))
+      // Sin red no se refresca: el SW respondería con su caché y la copia local quedaría
+      // fechada "ahora". Se muestra la copia local con su fecha real.
+      const work = isOffline() ? Promise.reject(new Error('offline')) : refreshCatalog();
+      work
+        .then(
+          () => {
+            markSnapshotFresh(CATALOG_USAGE_KEY);
+            if (active) setFailed(false);
+          },
+          () => {
+            if (active) setFailed(true);
+            void showCatalogSavedAt().catch(() => undefined);
+          },
+        )
         .finally(() => active && setRefreshing(false));
     };
     refresh();

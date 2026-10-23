@@ -121,7 +121,7 @@ outbox con `Idempotency-Key`. El SW **no** guarda datos privados: lo privado viv
 | `src/offline/snapshots.ts`, `snapshotStatus.ts`, `src/services/snapshotClient.ts` | Instantáneas de solo lectura de datos privados por usuario (7 días, máx. 200; nunca ante 401/403); `snapshotGet` en los GET privados de los servicios. |
 | `src/hooks/useOnlineStatus.ts` | Estado de red del navegador (`useSyncExternalStore`). |
 | `components/PendingSync.tsx`, `ProductConflictPanel.tsx` | `/pending` ("Pendientes de envío"): estado de cada pendiente y acciones (revisar en el carrito, combinar, aplicar de todos modos, reintentar, descartar). |
-| `components/SyncIndicator.tsx`, `ConnectionBanner.tsx`, `OfflineDataBanner.tsx`, `ReloadPrompt.tsx` | Botón "Sincronizar (N)" y "N por revisar"; franja "Sin conexión"; aviso "datos guardados el {fecha}"; registro del SW y aviso "Nueva versión disponible" (montado en la raíz de `App`). |
+| `components/SyncIndicator.tsx`, `OfflineDataBanner.tsx`, `ReloadPrompt.tsx` | Botón "Sincronizar (N)" y "N por revisar"; aviso amarillo "datos guardados el {fecha}" (vistas privadas y, con la fecha de la copia local, Tienda y Catálogo); registro del SW y aviso "Nueva versión disponible" (montado en la raíz de `App`). |
 | `src/**/*.test.ts` | Vitest (`environment: node`, `fake-indexeddb`): reglas de caché, catálogo, borradores, outbox, motor, conflictos, instantáneas, políticas de actualización. |
 | `Dockerfile`, `.dockerignore` | Imagen de producción: build de Vite (las `VITE_*` llegan como `build.args`) servido por Caddy. |
 
