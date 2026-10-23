@@ -2,6 +2,9 @@
 # El ID lo imprime `cloudflared tunnel create multicatalogo` (también: `cloudflared tunnel list`).
 tunnel: <TUNNEL_ID>
 credentials-file: /etc/cloudflared/credentials.json
+# HTTP/2 sobre TCP 443: muchas redes bloquean el UDP 7844 que usa QUIC (por defecto) y el
+# túnel nunca conecta (error 1033 en el navegador).
+protocol: http2
 
 # Ambos dominios van a Caddy (web:80), que separa PWA y API por el Host.
 ingress:
