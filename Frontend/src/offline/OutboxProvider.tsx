@@ -13,6 +13,16 @@ import { isOffline, OUTBOX_CHANGED, userOutbox } from './outbox';
 import { SYNC_OUTBOX_MESSAGE } from './syncMessages';
 import { OutboxContext } from './outboxContext';
 import { syncOutbox, type SyncReport } from './syncEngine';
+import { refreshCatalog } from './catalogStore';
+import { loadPaymentMethods } from './paymentMethods';
+
+// Precarga lo que el checkout necesita sin conexión (catálogo y métodos de pago), aunque
+// el usuario nunca haya abierto esas vistas con red. Fallos silenciosos: se reintenta al
+// volver la conexión y cada vista vuelve a pedir sus datos al abrirse.
+const prefetchOfflineData = () => {
+  void refreshCatalog().catch(() => undefined);
+  void loadPaymentMethods().catch(() => undefined);
+};
 
 const NO_ENTRIES: never[] = [];
 
@@ -46,6 +56,14 @@ export const OutboxProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     void Promise.resolve().then(syncNow);
   }, [syncNow]);
+
+  // Datos para comprar sin conexión: al iniciar sesión y cada vez que vuelve la red.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    if (!isOffline()) prefetchOfflineData();
+    window.addEventListener('online', prefetchOfflineData);
+    return () => window.removeEventListener('online', prefetchOfflineData);
+  }, [isAuthenticated, owner]);
 
   // Conexión, pendientes nuevos y Background Sync.
   useEffect(() => {

@@ -40,6 +40,9 @@ export interface OutboxEntry {
   path: string;
   payload: unknown;
   baseVersion?: number;
+  // Valores del recurso cuando se empezó a editar (edición de producto): permiten la
+  // combinación a tres bandas de un conflicto (qué cambié yo y qué cambió el servidor).
+  base?: unknown;
   // Texto para el usuario: "Pedido de 3 productos ($45.00)".
   label: string;
   status: OutboxStatus;

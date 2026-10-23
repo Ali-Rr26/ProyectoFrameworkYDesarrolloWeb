@@ -2,6 +2,7 @@
 // Estado del outbox en la barra superior: botón "Sincronizar ahora" con el número de
 // pendientes, aviso de los que requieren revisión y confirmación breve de lo enviado.
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { RefreshCw } from 'lucide-react';
 import { orderNumber } from '../data/orders';
 import type { OutboxEntry } from '../offline/db';
@@ -48,12 +49,13 @@ const SyncIndicator = () => {
       )}
 
       {needsAttention > 0 && (
-        <span
-          className="text-xs font-semibold text-amber-800 bg-amber-100 rounded-full px-2 py-1"
+        <Link
+          to="/pending"
+          className="min-h-11 flex items-center text-xs font-semibold text-amber-800 bg-amber-100 rounded-full px-3 hover:bg-amber-200 transition"
           title="Pendientes rechazados por el servidor (precio, stock o datos cambiaron): requieren revisión"
         >
           {needsAttention} por revisar
-        </span>
+        </Link>
       )}
 
       {queued > 0 && (

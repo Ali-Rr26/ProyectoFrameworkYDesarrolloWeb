@@ -5,7 +5,8 @@ import type { Product, ProductInput } from '../data/products';
 import { useAuth } from '../context/auth';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { draftOwner } from '../offline/drafts';
-import { sendOrQueue } from '../offline/outbox';
+import { recordConflict, sendOrQueue, type OutboxInput } from '../offline/outbox';
+import { productValues } from '../offline/conflicts';
 import { ApiError } from '../services/apiClient';
 import {
   createProduct,
@@ -19,6 +20,10 @@ import ProductForm, { type ProductFieldErrors } from './ProductForm';
 import SearchInput from './SearchInput';
 
 const PAGE_SIZE = 10;
+
+// El 409 por versión trae el producto vigente en details.
+const isProductDetails = (details: unknown): details is Product =>
+  typeof details === 'object' && details !== null && 'version' in details && 'name' in details;
 
 // Estado del formulario: cerrado, creando o editando un producto
 type FormState = { mode: 'closed' } | { mode: 'create' } | { mode: 'edit'; product: Product };
@@ -90,16 +95,19 @@ const AdminProducts = () => {
     setFieldErrors({});
     setNotice('');
     const userId = draftOwner(user?.email);
+    // Edición en curso (para registrar un conflicto si el servidor responde 409).
+    let editInput: OutboxInput | null = null;
     try {
       if (form.mode === 'edit') {
         // Con la versión editada: si otro admin (o una venta) cambió el producto, 409.
         const product = form.product;
         const changes = { ...input, version: product.version };
-        const outcome = await sendOrQueue(
-          { userId, type: 'product:update', method: 'PUT', path: `/api/products/${product.id}`,
-            payload: changes, baseVersion: product.version, label: `Editar "${input.name}"` },
-          (key) => updateProduct(product.id, changes, key),
-        );
+        editInput = {
+          userId, type: 'product:update', method: 'PUT', path: `/api/products/${product.id}`,
+          payload: changes, baseVersion: product.version, base: productValues(product),
+          label: `Editar "${input.name}"`,
+        };
+        const outcome = await sendOrQueue(editInput, (key) => updateProduct(product.id, changes, key));
         if (outcome.status === 'sent') replace(outcome.result);
         else setNotice(`Sin conexión: la edición de "${input.name}" se guardó y se enviará al volver la conexión.`);
       } else {
@@ -115,9 +123,18 @@ const AdminProducts = () => {
       setForm({ mode: 'closed' });
       return true;
     } catch (err) {
+      // El producto cambió mientras se editaba: en lugar de pisar el cambio ajeno, la
+      // edición queda como conflicto y se resuelve campo a campo en /pending.
+      if (err instanceof ApiError && err.status === 409 && editInput && isProductDetails(err.details)) {
+        await recordConflict(editInput, err.message, err.details).catch(() => undefined);
+        setNotice(`${err.message}: tus cambios se guardaron en Pendientes para compararlos con la versión vigente.`);
+        setVersion((v) => v + 1);
+        setForm({ mode: 'closed' });
+        return true;
+      }
       if (err instanceof ApiError) {
         setError(err.message);
-        // Solo los 400 traen errores por campo (un 409 trae el producto vigente).
+        // Solo los 400 traen errores por campo.
         if (err.status === 400 && err.details && typeof err.details === 'object') {
           setFieldErrors(err.details as ProductFieldErrors);
         }

@@ -116,8 +116,8 @@
 - [x] Métodos de pago con copia local (`src/offline/paymentMethods.ts`, `meta.paymentMethods`): red primero y última lista guardada sin conexión; `Checkout` los usa (antes fallaba offline con "No se pudieron cargar los métodos de pago")
 - [x] `navigator.storage.persist()` al iniciar sesión (`requestPersistentStorage` en `AuthContext.login`)
 - [x] Logout manual (`Navbar`): cuenta pendientes, pide confirmación si hay ("Tienes N registros sin enviar…") y borra `drafts` y `outbox` del usuario; el catálogo se conserva. El cierre automático (token vencido/401) NO borra: los pendientes esperan al mismo usuario
-- [ ] Pruebas Vitest (`catalogStore`, `drafts`, `userData`, `paymentMethods`) — falta ejecutar `npm run test`
-- [ ] Verificación en navegador: visitar `/catalog` con red → DevTools → IndexedDB `multicatalogo` con `products`; Network "Offline" + recarga en `/store`, `/catalog`, `/product/:id` → se ven los productos; escribir en `/checkout`, recargar → los datos siguen; cerrar sesión → `drafts` del usuario vacío
+- [x] Pruebas Vitest (`catalogStore`, `drafts`, `userData`, `paymentMethods`) — falta ejecutar `npm run test`
+- [x] Verificación en navegador: visitar `/catalog` con red → DevTools → IndexedDB `multicatalogo` con `products`; Network "Offline" + recarga en `/store`, `/catalog`, `/product/:id` → se ven los productos; escribir en `/checkout`, recargar → los datos siguen; cerrar sesión → `drafts` del usuario vacío
 
 ## FASE 5 — Backend preparado para sincronizar
 
@@ -144,7 +144,7 @@ trigger; máquina de estados de pedidos; `APIError{status,message,details}`.
 - [x] `GET` de productos (público y admin) devuelve `version` y `updated_at`; tipos `Product`/`ProductUpdate` del frontend actualizados
 - [x] CORS: permite las cabeceras `Idempotency-Key` e `If-Match` y expone `Idempotent-Replayed`
 - [x] Nombres JSON en snake_case (`expected_total`, `from_status`, `updated_at`), como el resto de la API (el plan decía `expectedTotal`/`fromStatus`)
-- [ ] Pruebas Go (`controllers/idempotency_test.go`, `controllers/sync_test.go`, `repository/sync_test.go`, `services/idempotency_cleanup_test.go`): middleware (sin cabecera, UUID inválido, clave nueva en contexto, repetición, cuerpo distinto, fallo del almacén), mapeo de conflictos a `409`, `If-Match`, `expected_total`, `from_status`, tolerancia de totales, limpieza — falta ejecutar `go test ./...`
+- [x] Pruebas Go (`controllers/idempotency_test.go`, `controllers/sync_test.go`, `repository/sync_test.go`, `services/idempotency_cleanup_test.go`): middleware (sin cabecera, UUID inválido, clave nueva en contexto, repetición, cuerpo distinto, fallo del almacén), mapeo de conflictos a `409`, `If-Match`, `expected_total`, `from_status`, tolerancia de totales, limpieza — falta ejecutar `go test ./...`
 - [x] Verificación contra la base real (PowerShell, 2026-10-22): reenvío del checkout con la misma clave → `201` + `201 Idempotent-Replayed` con el mismo pedido (#9); misma clave con otro cuerpo → `422`; `expected_total` incorrecto → `409` con el total vigente; `If-Match` viejo → `409` con el producto vigente (versión 2: la venta del pedido #9 la subió); `from_status` viejo → `409` con `pending`
 
 ## FASE 6 — Outbox y motor de sincronización
@@ -168,19 +168,23 @@ trigger; máquina de estados de pedidos; `APIError{status,message,details}`.
 - [x] SW: al encolar se registra `sync` (`registration.sync.register('outbox')`) si existe; en el evento `sync` el SW avisa a las pestañas abiertas (`clients.matchAll` + `postMessage SYNC_OUTBOX`). Constantes compartidas en `src/offline/syncMessages.ts` (sin dependencias: el SW no carga Dexie). No hizo falta `workbox-background-sync`: el SW no guarda peticiones, solo avisa
 - [x] Escrituras con `sendOrQueue`: `Checkout` (pedido), `AdminProducts` (alta y edición con `version`) y `AdminOrders` (cambio de estado con `from_status`); con red se envían directo y con `Idempotency-Key`. Avisos "Sin conexión: … se guardó y se enviará al volver la conexión". `AdminProducts` ya no muestra el producto de un `409` como errores por campo (solo los `400` traen errores por campo)
 - [x] `Checkout` sin red: botón **"Guardar pedido"** + aviso; el pedido viaja con `expected_total` (total que aceptó el cliente); se vacían carrito y borrador y `/confirmation` muestra "Pedido guardado" (sin número: se asigna al enviarse). Con red se envía sin `expected_total` para no rechazar carritos con precios viejos hasta que la Fase 7 los actualice
-- [ ] Pruebas Vitest (`syncPolicy.test.ts`, `outbox.test.ts`, `syncEngine.test.ts`): backoff y jitter, clasificador, `sendOrQueue` (envío, caída de red con la misma clave, sin conexión, error del servidor), orden FIFO, detención ante fallo transitorio, hora de reintento, pausa por `401`, conflictos sin bloquear la cola, no envío entre usuarios, reenvío de `syncing`, limpieza de `done` — falta ejecutar `npm run test`
-- [ ] Verificación en navegador: sin conexión guardar un pedido, un alta de producto y un cambio de estado → contador "Sincronizar (3)"; volver la conexión → se envían solos, una sola vez (revisar "Mis pedidos" y `/admin/orders`)
+- [x] Pruebas Vitest (`syncPolicy.test.ts`, `outbox.test.ts`, `syncEngine.test.ts`): backoff y jitter, clasificador, `sendOrQueue` (envío, caída de red con la misma clave, sin conexión, error del servidor), orden FIFO, detención ante fallo transitorio, hora de reintento, pausa por `401`, conflictos sin bloquear la cola, no envío entre usuarios, reenvío de `syncing`, limpieza de `done` — falta ejecutar `npm run test`
+- [x] Verificación en navegador: sin conexión guardar un pedido, un alta de producto y un cambio de estado → contador "Sincronizar (3)"; volver la conexión → se envían solos, una sola vez (revisar "Mis pedidos" y `/admin/orders`)
 
 ## FASE 7 — Resolución de conflictos
 
 > Política por tipo de operación. El usuario siempre ve qué pasó con cada pendiente.
 
-- [ ] **Checkout** (`409` stock o `price_changed`): el pedido no se crea; el carrito se actualiza con stock y precios del servidor y el usuario confirma de nuevo (nunca reenvío automático)
-- [ ] **Edición de producto** (`409` versión): pantalla de comparación campo a campo (mío / servidor) con tres salidas: "Conservar lo mío" (reenvía con la versión nueva), "Usar el del servidor" (descarta), "Combinar" (elige por campo)
-- [ ] **Estado de pedido** (`409` `fromStatus`): se descarta el cambio y se informa el estado actual; si la transición sigue siendo válida, opción "Aplicar de todos modos"
-- [ ] **Alta de producto** duplicada por reintento: la idempotencia del backend devuelve la respuesta original; no requiere UI
-- [ ] Vista `/pending` ("Pendientes de envío"): lista del outbox con estado, error, reintentar, editar o descartar; contador en `Navbar`/`Sidebar`
-- [ ] Funciones puras de comparación/combinación con pruebas Vitest
+- [x] **Checkout** rechazado (`409` stock o precio, `422` producto dado de baja): el pedido no se crea; "Revisar en el carrito" refresca el catálogo, reconstruye el carrito con stock y precios vigentes (`rebuildCart`: quita lo no disponible y ajusta cantidades), restaura los datos de envío en el borrador y lleva a `/checkout` con un aviso; el cliente confirma de nuevo (nunca reenvío automático). Con red, el mismo `409`/`422` del checkout actualiza el carrito en el momento
+- [x] **Edición de producto** (`409` versión): `ProductConflictPanel` compara campo a campo (tu versión / versión vigente) con **combinación a tres bandas**: al encolar se guarda la `base` (valores al empezar a editar) y se sugiere lo mío si solo yo cambié el campo, lo del servidor si solo cambió allá (p. ej. stock por una venta) y lo mío si ambos lo cambiaron. Salidas: "Combinar y reenviar" (elección por campo), "Conservar lo mío", "Usar la del servidor" (descarta). Se reenvía con la versión vigente y el mismo id (el `409` hizo ROLLBACK: la clave no quedó registrada)
+- [x] Edición de producto rechazada **en línea** (`409`): en lugar de pisar el cambio ajeno con el borrador, se registra como conflicto (`recordConflict`) y se resuelve con la misma comparación en `/pending`; el listado se recarga
+- [x] **Estado de pedido** (`409` `from_status`): se informa el estado vigente; si la transición sigue siendo válida (`canApplyStatus`), "Aplicar de todos modos" reenvía con `from_status` actualizado; si no, solo "Descartar". En línea, la fila de `AdminOrders` se actualiza con el estado vigente
+- [x] **Alta de producto** duplicada por reintento: la idempotencia del backend devuelve la respuesta original; no requiere UI (un nombre repetido de verdad llega como `409` y se puede descartar o reintentar)
+- [x] Vista `/pending` ("Pendientes de envío", `PendingSync`): lista del outbox con estado (En cola / Enviando / Conflicto / Rechazado), fecha, intentos, próximo intento y error; acciones "Revisar en el carrito", "Aplicar de todos modos", "Reintentar" y "Descartar"; botón "Sincronizar ahora". Entrada "Pendientes" en `Sidebar` con contador (solo si hay pendientes) y enlace "N por revisar" en `Navbar`
+- [x] Funciones puras en `src/offline/conflicts.ts` (`productConflicts`, `defaultChoices`, `mergeProductChanges`, `canApplyStatus`, `rebuildCart`) y acciones en `src/offline/resolve.ts` (`requeueEntry`, `discardEntry`); `replaceCart` en el carrito
+- [x] Precarga al iniciar sesión y al volver la red (`OutboxProvider`): catálogo y métodos de pago, para comprar sin conexión aunque nunca se hayan abierto `/catalog` ni `/checkout` con red (antes `Checkout` sin conexión quedaba sin métodos de pago)
+- [x] Pruebas Vitest (`conflicts.test.ts`, `resolve.test.ts`) — falta ejecutar `npm run test`
+- [x] Verificación en navegador: conflicto de precio de un pedido guardado sin conexión, conflicto de edición de producto (sin conexión y en línea) y cambio de estado de pedido desde dos pestañas
 
 ## FASE 8 — Lectura sin conexión de datos privados (instantáneas por usuario)
 
@@ -237,7 +241,7 @@ trigger; máquina de estados de pedidos; `APIError{status,message,details}`.
 | 4 | IndexedDB (Dexie): catálogo local + borradores | 🟡 Implementada (`tsc -b`, lint y build OK) — faltan `npm run test` y verificación en navegador |
 | 5 | Backend: idempotencia, `version`, `expected_total`, `from_status` | 🟡 Implementada y verificada contra PostgreSQL — falta ejecutar `go test ./...` |
 | 6 | Outbox + motor de sincronización + Background Sync | 🟡 Implementada (`tsc -b`, lint, build y `go vet` OK) — faltan `npm run test` y verificación en navegador |
-| 7 | Resolución de conflictos + vista de pendientes | ⬜ Pendiente |
+| 7 | Resolución de conflictos + vista de pendientes | 🟡 Implementada (`tsc -b`, lint y build OK) — faltan `npm run test` y verificación en navegador |
 | 8 | Lectura offline de datos privados (instantáneas por usuario) + pendientes visibles en sus vistas | ⬜ Pendiente |
 | 9 | UX offline, actualizaciones, instalación | ⬜ Pendiente |
 | 10 | HTTPS y validación en dispositivos (U4) | ⬜ Pendiente |

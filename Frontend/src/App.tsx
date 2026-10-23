@@ -16,6 +16,7 @@ import AdminProducts from './components/AdminProducts';
 import AdminOrders from './components/AdminOrders';
 import AdminPayouts from './components/AdminPayouts';
 import MyOrders from './components/MyOrders';
+import PendingSync from './components/PendingSync';
 import { CartProvider } from './context/CartContext';
 import { AuthProvider } from './context/AuthContext';
 import { OutboxProvider } from './offline/OutboxProvider';
@@ -93,6 +94,7 @@ function App() {
                 <Route path="confirmation" element={<Confirmation />} />
                 <Route path="my-orders" element={<MyOrders />} />
                 <Route path="my-network" element={<MyNetwork />} />
+                <Route path="pending" element={<PendingSync />} />
               </Route>
             </Route>
 

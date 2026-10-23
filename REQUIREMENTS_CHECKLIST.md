@@ -161,7 +161,8 @@ React SPA (:5173) ──► Caddy/Nginx (U4: proxy inverso + SSL)
 - [ ] Pruebas (`npm run test`) y verificación offline → online en navegador
 
 ## PWA-F7 · Resolución de conflictos
-- [ ] Checkout re-confirmado con stock/precio del servidor, comparación campo a campo en productos, estado de pedido validado, vista `/pending`
+- [x] Checkout rechazado → carrito reconstruido con stock/precio vigentes y re-confirmación; comparación campo a campo de productos con combinación a tres bandas (también para el `409` en línea); estado de pedido con "Aplicar de todos modos" si sigue siendo válido; vista `/pending` con contador en `Sidebar`/`Navbar`
+- [ ] Pruebas (`npm run test`) y verificación de conflictos en navegador
 
 ## PWA-F8 · Lectura sin conexión de datos privados
 - [ ] Tabla `snapshots` (esquema v2), `withSnapshot` + `useSnapshotQuery`, aviso "datos guardados el {fecha}" / "Requiere conexión" en `Dashboard`, `MyOrders`, `MyNetwork`, comisiones, liquidaciones y listados admin; pendientes del outbox visibles en su vista; limpieza al cerrar sesión y caducidad 7 días

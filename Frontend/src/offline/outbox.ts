@@ -17,6 +17,7 @@ export interface OutboxInput {
   path: string;
   payload: unknown;
   baseVersion?: number;
+  base?: unknown;
   label: string;
 }
 
@@ -51,6 +52,29 @@ export const enqueue = async (input: OutboxInput, database: OfflineDB = db): Pro
   await database.outbox.add(entry);
   notifyOutboxChanged();
   void requestBackgroundSync();
+  return entry;
+};
+
+// Registra directamente como conflicto una operación que el servidor rechazó con 409
+// estando en línea (p. ej. edición de producto con versión vieja): se resuelve con la
+// misma comparación de la vista de pendientes en lugar de pisar el cambio ajeno.
+export const recordConflict = async (
+  input: OutboxInput,
+  message: string,
+  details: unknown,
+  database: OfflineDB = db,
+): Promise<OutboxEntry> => {
+  const entry: OutboxEntry = {
+    ...input,
+    id: input.id ?? crypto.randomUUID(),
+    status: 'conflict',
+    attempts: 1,
+    lastError: message,
+    details,
+    createdAt: new Date().toISOString(),
+  };
+  await database.outbox.add(entry);
+  notifyOutboxChanged();
   return entry;
 };
 

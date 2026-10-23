@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/cart';
 import { createOrder, type CreateOrderPayload } from '../services/orderService';
 import { ApiError } from '../services/apiClient';
@@ -12,6 +12,7 @@ import { useAuth } from '../context/auth';
 import { draftOwner } from '../offline/drafts';
 import { isOffline, sendOrQueue } from '../offline/outbox';
 import { useOutbox } from '../offline/outboxContext';
+import { recoverCart } from '../offline/cartRecovery';
 
 // type (no interface): useDraft exige un objeto indexable por string.
 type ShippingData = {
@@ -24,11 +25,13 @@ type ShippingData = {
 };
 
 const Checkout = () => {
-  const { cart, totalPrice, clearCart } = useCart();
+  const { cart, totalPrice, clearCart, replaceCart } = useCart();
   const { user } = useAuth();
   // Sin conexión el pedido se guarda en el outbox y se envía al volver la red.
   const { online } = useOutbox();
   const navigate = useNavigate();
+  // Aviso al volver de un pedido rechazado (vista de pendientes): carrito actualizado.
+  const notice = (useLocation().state as { notice?: string } | null)?.notice;
 
   // Datos de envío con borrador local: sobreviven a recargas, cierres y falta de conexión.
   const [shipping, setShipping, clearDraft] = useDraft<ShippingData>("checkout", {
@@ -138,10 +141,18 @@ const Checkout = () => {
       clearCart();
       navigate("/confirmation", { state: { order } });
     } catch (err) {
-      // p. ej. "Stock insuficiente" (409) o "Referencia inválida" (422) con su detalle
+      // p. ej. "Stock insuficiente" (409) o "Producto no disponible" (422) con su detalle
       if (err instanceof ApiError) {
         const detail = typeof err.details === "string" ? ` (${err.details})` : "";
-        setError(`${err.message}${detail}`);
+        let notes: string[] = [];
+        // Stock, precio o producto cambiaron: el carrito se actualiza con los datos
+        // vigentes y el cliente revisa y confirma de nuevo (nunca se reenvía solo).
+        if (err.status === 409 || err.status === 422) {
+          const recovered = await recoverCart(order.items);
+          replaceCart(recovered.items);
+          notes = recovered.notes;
+        }
+        setError([`${err.message}${detail}`, ...notes, ...(notes.length ? ["Revisa el carrito actualizado y confirma de nuevo."] : [])].join(". "));
       } else {
         setError("No se pudo conectar con el servidor");
       }
@@ -152,6 +163,9 @@ const Checkout = () => {
   return (
     <div>
       <h1 className="text-2xl font-bold text-slate-800 mb-6">Finalizar Compra</h1>
+      {notice && (
+        <div className="bg-amber-50 text-amber-800 p-3 rounded-lg text-sm mb-6 border border-amber-200">{notice}</div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* ===== FORMULARIO DE ENVÍO ===== */}

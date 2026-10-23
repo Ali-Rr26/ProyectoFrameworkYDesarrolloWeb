@@ -71,6 +71,19 @@ const AdminOrders = () => {
         data: prev.data.map((o) => (o.id === updated.id ? { ...o, status: updated.status } : o)),
       });
     } catch (err) {
+      // Otro admin lo cambió mientras tanto (409 con el estado vigente): se muestra el
+      // estado actual en la fila y el admin decide de nuevo con los botones vigentes.
+      const current = err instanceof ApiError && err.status === 409
+        ? (err.details as { status?: OrderStatus } | undefined)?.status
+        : undefined;
+      if (current) {
+        setResult((prev) => prev && {
+          ...prev,
+          data: prev.data.map((o) => (o.id === order.id ? { ...o, status: current } : o)),
+        });
+        setError(`${err instanceof ApiError ? err.message : ''}: ${orderNumber(order.id)} ya está "${STATUS_LABELS[current]}".`);
+        return;
+      }
       setError(err instanceof ApiError ? err.message : 'No se pudo actualizar el pedido');
     } finally {
       setSavingId(null);
