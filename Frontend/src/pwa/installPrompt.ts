@@ -18,6 +18,10 @@ export interface InstallState {
   ios: boolean;
 }
 
+// Pasos para iPhone/iPad (Safari no tiene diálogo de instalación).
+export const IOS_INSTALL_STEPS =
+  'Para instalar MultiCatálogo en tu iPhone o iPad: toca Compartir y luego "Agregar a pantalla de inicio".';
+
 let deferred: BeforeInstallPromptEvent | null = null;
 const listeners = new Set<() => void>();
 

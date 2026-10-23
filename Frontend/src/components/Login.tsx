@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/auth';
 import { apiFetch, ApiError, NetworkError } from '../services/apiClient';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
+import InstallAppButton from './InstallAppButton';
 
 // Respuesta de POST /api/login
 interface LoginResponse {
@@ -120,6 +121,8 @@ const Login = () => {
             Crear cuenta
           </Link>
         </p>
+        {/* Instalar la PWA desde la entrada (solo si el navegador lo permite y no está instalada) */}
+        <InstallAppButton />
         <div className="mt-6 p-4 bg-slate-50 rounded-lg border border-slate-200 text-xs text-slate-600 space-y-1">
           <p className="font-semibold text-slate-700">Cuentas de prueba:</p>
           <p>👑 Admin: <span className="font-mono">admin@upse.edu.ec / 123456</span></p>

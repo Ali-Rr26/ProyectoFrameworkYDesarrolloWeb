@@ -8,7 +8,7 @@ import { ROLE_LABELS } from '../data/constants';
 import { draftOwner } from '../offline/drafts';
 import { clearUserData, countPending } from '../offline/userData';
 import SyncIndicator from './SyncIndicator';
-import { promptInstall, useInstallPrompt } from '../pwa/installPrompt';
+import { IOS_INSTALL_STEPS, promptInstall, useInstallPrompt } from '../pwa/installPrompt';
 
 interface NavbarProps {
   onMenuClick: () => void;
@@ -32,7 +32,7 @@ const Navbar = ({ onMenuClick, onToggleCollapse, isCollapsed }: NavbarProps) => 
       void promptInstall();
       return;
     }
-    window.alert('Para instalar MultiCatálogo en tu iPhone o iPad: toca Compartir y luego "Agregar a pantalla de inicio".');
+    window.alert(IOS_INSTALL_STEPS);
   };
 
   // Cierre de sesión manual: borra borradores y pendientes locales del usuario.
