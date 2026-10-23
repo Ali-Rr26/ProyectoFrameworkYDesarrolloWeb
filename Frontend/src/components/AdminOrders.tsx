@@ -17,8 +17,7 @@ import { ApiError, errorMessage } from '../services/apiClient';
 import { getOrders, updateOrderStatus, type OrderStatusPayload } from '../services/orderService';
 import OrderCard from './OrderCard';
 import Pagination from './Pagination';
-
-const PAGE_SIZE = 10;
+import { ADMIN_ORDERS_PAGE_SIZE as PAGE_SIZE } from '../services/pageSizes';
 
 // /admin/orders: todos los pedidos con filtro por estado y gestión de su ciclo de vida.
 const AdminOrders = () => {

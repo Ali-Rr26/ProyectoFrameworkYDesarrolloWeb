@@ -10,8 +10,7 @@ import { useOutbox } from '../offline/outboxContext';
 import { getUsers, updateUser } from '../services/userService';
 import Pagination from './Pagination';
 import SearchInput from './SearchInput';
-
-const PAGE_SIZE = 10;
+import { ADMIN_USERS_PAGE_SIZE as PAGE_SIZE } from '../services/pageSizes';
 
 // /admin/users: cuentas paginadas con búsqueda en el servidor (?q=).
 const AdminUsers = () => {

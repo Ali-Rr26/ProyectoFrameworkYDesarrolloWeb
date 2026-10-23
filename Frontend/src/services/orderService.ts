@@ -32,16 +32,21 @@ export const getPaymentMethods = (): Promise<string[]> => apiFetch<string[]>('/a
 
 // Arma el query string de un listado paginado (?page=&limit=&status=).
 // Pedidos del usuario autenticado (el comprador sale del token).
+export const myOrdersPath = (page: number, limit: number): string => `/api/orders/mine?${listQuery(page, limit)}`;
+
 export const getMyOrders = (page: number, limit: number): Promise<Page<OrderSummary>> =>
-  snapshotGet<Page<OrderSummary>>(`/api/orders/mine?${listQuery(page, limit)}`);
+  snapshotGet<Page<OrderSummary>>(myOrdersPath(page, limit));
 
 // Detalle de un pedido: el dueño o un admin.
 export const getOrder = (id: number): Promise<OrderDetail> => snapshotGet<OrderDetail>(`/api/orders/${id}`);
 
 // ===== Solo administrador =====
 
+export const ordersPath = (page: number, limit: number, status: OrderStatus | ''): string =>
+  `/api/orders?${listQuery(page, limit, { status })}`;
+
 export const getOrders = (page: number, limit: number, status: OrderStatus | ''): Promise<Page<OrderSummary>> =>
-  snapshotGet<Page<OrderSummary>>(`/api/orders?${listQuery(page, limit, { status })}`);
+  snapshotGet<Page<OrderSummary>>(ordersPath(page, limit, status));
 
 // Cambia el estado; "cancelled" repone el stock y revierte las comisiones. fromStatus es el
 // estado que vio el admin: si otro lo cambió mientras tanto, el servidor responde 409.

@@ -24,8 +24,11 @@ export const getCategories = (): Promise<string[]> => apiFetch<string[]>('/api/c
 // ===== Solo administrador =====
 
 // Productos paginados, incluidos los dados de baja, con búsqueda por nombre o categoría (?q=).
+export const adminProductsPath = (page: number, limit: number, q: string): string =>
+  `/api/admin/products?${listQuery(page, limit, { q })}`;
+
 export const getAdminProducts = (page: number, limit: number, q: string): Promise<Page<Product>> =>
-  snapshotGet<Page<Product>>(`/api/admin/products?${listQuery(page, limit, { q })}`);
+  snapshotGet<Page<Product>>(adminProductsPath(page, limit, q));
 
 export const createProduct = (input: ProductInput, idempotencyKey?: string): Promise<Product> =>
   apiFetch<Product>('/api/products', { method: 'POST', body: input, headers: idempotencyHeaders(idempotencyKey) });

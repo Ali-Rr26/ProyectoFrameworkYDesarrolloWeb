@@ -3,7 +3,6 @@ import { useState } from "react";
 import Sidebar from "./Sidebar";
 import Navbar from "./Navbar";
 import OfflineDataBanner from "./OfflineDataBanner";
-import ConnectionBanner from "./ConnectionBanner";
 
 const Layout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -28,7 +27,6 @@ const Layout = () => {
           onToggleCollapse={() => setIsCollapsed(!isCollapsed)}
           isCollapsed={isCollapsed}
         />
-        <ConnectionBanner />
 
         {/* relative: los elementos absolutos de las páginas (p. ej. etiquetas sr-only) se ubican y
             recortan dentro de esta área con scroll; sin él escapan a la página y crean una segunda

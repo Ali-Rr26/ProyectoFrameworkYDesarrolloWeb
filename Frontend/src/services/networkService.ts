@@ -3,4 +3,6 @@ import { snapshotGet } from './snapshotClient';
 
 // Requiere token: el backend devuelve la red del usuario autenticado
 // (o la red raíz configurada cuando consulta un administrador).
-export const getNetwork = (): Promise<NetworkNode> => snapshotGet<NetworkNode>('/api/network');
+export const NETWORK_PATH = '/api/network';
+
+export const getNetwork = (): Promise<NetworkNode> => snapshotGet<NetworkNode>(NETWORK_PATH);
