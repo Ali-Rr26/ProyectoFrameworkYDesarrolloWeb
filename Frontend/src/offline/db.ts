@@ -57,11 +57,21 @@ export interface OutboxEntry {
   createdAt: string;
 }
 
+// Instantánea de solo lectura de una consulta privada (Fase 8): la última respuesta vista
+// con red, por usuario. `key` es la ruta con su query (página, filtros, rango).
+export interface SnapshotEntry {
+  userId: string;
+  key: string;
+  data: unknown;
+  savedAt: string;
+}
+
 export class OfflineDB extends Dexie {
   declare products: EntityTable<LocalProduct, 'id'>;
   declare meta: EntityTable<MetaEntry, 'key'>;
   declare drafts: Table<DraftEntry, [string, string]>;
   declare outbox: EntityTable<OutboxEntry, 'id'>;
+  declare snapshots: Table<SnapshotEntry, [string, string]>;
 
   constructor(name = 'multicatalogo') {
     super(name);
@@ -70,6 +80,10 @@ export class OfflineDB extends Dexie {
       meta: 'key',
       drafts: '[userId+formKey], userId',
       outbox: 'id, userId, status, createdAt, [userId+status]',
+    });
+    // v2 (Fase 8): instantáneas de datos privados por usuario.
+    this.version(2).stores({
+      snapshots: '[userId+key], userId, savedAt',
     });
   }
 }

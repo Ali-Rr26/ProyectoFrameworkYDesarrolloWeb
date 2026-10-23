@@ -2,6 +2,7 @@ import { Outlet } from "react-router-dom";
 import { useState } from "react";
 import Sidebar from "./Sidebar";
 import Navbar from "./Navbar";
+import OfflineDataBanner from "./OfflineDataBanner";
 
 const Layout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -30,6 +31,7 @@ const Layout = () => {
             recortan dentro de esta área con scroll; sin él escapan a la página y crean una segunda
             barra de desplazamiento con una franja vacía al final. */}
         <main className="relative flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-8">
+          <OfflineDataBanner />
           <Outlet />
         </main>
       </div>

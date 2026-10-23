@@ -165,7 +165,8 @@ React SPA (:5173) ──► Caddy/Nginx (U4: proxy inverso + SSL)
 - [ ] Pruebas (`npm run test`) y verificación de conflictos en navegador
 
 ## PWA-F8 · Lectura sin conexión de datos privados
-- [ ] Tabla `snapshots` (esquema v2), `withSnapshot` + `useSnapshotQuery`, aviso "datos guardados el {fecha}" / "Requiere conexión" en `Dashboard`, `MyOrders`, `MyNetwork`, comisiones, liquidaciones y listados admin; pendientes del outbox visibles en su vista; limpieza al cerrar sesión y caducidad 7 días
+- [x] Tabla `snapshots` (esquema v2), `withSnapshot` + `snapshotGet` en los servicios privados, aviso global "datos guardados el {fecha}" y "Requiere conexión" en `Dashboard`, `MyOrders`, `MyNetwork`, comisiones, liquidaciones y listados admin; pendientes del outbox visibles en su vista; escrituras solo online deshabilitadas sin red; limpieza al cerrar sesión, caducidad 7 días y tope de 200
+- [ ] Pruebas (`npm run test`) y verificación offline en navegador
 
 ## PWA-F9 · Experiencia offline, actualizaciones e instalación
 - [ ] `useOnlineStatus` + banner, login/registro "Requiere conexión", `ReloadPrompt`, `useInstallPrompt`, `safe-area-inset`, prueba offline → online sin pedidos duplicados

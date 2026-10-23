@@ -10,7 +10,7 @@ import {
   type OrderStatus,
   type OrderSummary,
 } from '../data/orders';
-import { ApiError } from '../services/apiClient';
+import { errorMessage } from '../services/apiClient';
 import { getOrder } from '../services/orderService';
 import { formatDateTime } from '../data/dates';
 import { BUSINESS_TIMEZONE } from '../data/constants';
@@ -21,10 +21,12 @@ interface OrderCardProps {
   admin?: boolean;
   busy?: boolean;
   onChangeStatus?: (order: OrderSummary, status: OrderStatus) => void;
+  // Cambio guardado sin conexión que aún no llegó al servidor (outbox)
+  pendingChange?: string;
 }
 
 // Tarjeta de pedido: resumen siempre visible y detalle (ítems y envío) al expandir.
-const OrderCard = ({ order, admin = false, busy = false, onChangeStatus }: OrderCardProps) => {
+const OrderCard = ({ order, admin = false, busy = false, onChangeStatus, pendingChange }: OrderCardProps) => {
   const [expanded, setExpanded] = useState<boolean>(false);
   const [detail, setDetail] = useState<OrderDetail | null>(null);
   const [error, setError] = useState<string>('');
@@ -35,7 +37,7 @@ const OrderCard = ({ order, admin = false, busy = false, onChangeStatus }: Order
     let active = true;
     getOrder(order.id)
       .then((d) => active && setDetail(d))
-      .catch((err) => active && setError(err instanceof ApiError ? err.message : 'No se pudo cargar el pedido'));
+      .catch((err) => active && setError(errorMessage(err, 'No se pudo cargar el pedido')));
     return () => {
       active = false;
     };
@@ -59,6 +61,11 @@ const OrderCard = ({ order, admin = false, busy = false, onChangeStatus }: Order
             {formatDateTime(order.created_at, BUSINESS_TIMEZONE)} · {order.items_count} unidad(es)
           </p>
           {admin && <p className="text-sm text-slate-500 break-all">{order.buyer_name} · {order.buyer_email}</p>}
+          {pendingChange && (
+            <p className="mt-1 inline-block text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+              Pendiente de envío: {pendingChange}
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-3">
           <span className={`text-xs font-semibold px-2 py-1 rounded-full ${STATUS_STYLES[order.status]}`}>

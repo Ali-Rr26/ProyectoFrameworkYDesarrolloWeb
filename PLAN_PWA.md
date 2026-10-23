@@ -194,18 +194,19 @@ trigger; máquina de estados de pedidos; `APIError{status,message,details}`.
 **Ya existe:** `OfflineDB` (Fase 4), `draftOwner`/`clearUserData`, cliente HTTP único
 `apiFetch`, `NetworkError` (Fase 6).
 
-- [ ] Esquema v2 de `OfflineDB`: tabla `snapshots` (`[userId+key]`, `userId`, `savedAt`) con la última respuesta de cada consulta
-- [ ] `src/offline/snapshots.ts`: `withSnapshot(key, fetcher)` — red primero y guarda; ante `NetworkError` devuelve la instantánea con su `savedAt`; ante `401`/`403` nunca usa la instantánea (borra la del usuario si es `401`)
-- [ ] Hook `useSnapshotQuery(key, fetcher, deps)` → `{ data, loading, error, savedAt, fromSnapshot }`; la clave incluye página, filtros y rango (`orders:mine?page=1`, `reports:summary?range=last_30_days`)
-- [ ] Vistas cubiertas:
-  - cliente/distribuidor: `MyOrders` (`/api/orders/mine`), `MyNetwork` (`/api/network`), `CommissionsPanel` (`/api/commissions/mine`), `PayoutsPanel` (`/api/payouts/mine`)
+- [x] Esquema v2 de `OfflineDB`: tabla `snapshots` (`[userId+key]`, `userId`, `savedAt`) con la última respuesta de cada consulta; Dexie migra solo la base existente de v1 a v2
+- [x] `src/offline/snapshots.ts`: `withSnapshot(userId, key, fetcher)` — red primero y guarda; ante `NetworkError` devuelve la instantánea con su `savedAt`; sin instantánea (o vencida) lanza `NetworkError` "Requiere conexión: estos datos todavía no se guardaron en este dispositivo"; ante `401` borra las del usuario y nunca la usa; ante `403` no la usa
+- [x] En lugar de un hook por vista, la instantánea va en la capa de servicios: `snapshotGet(path)` (`src/services/snapshotClient.ts`) reemplaza a `apiFetch` en los GET privados y la clave es la ruta con su query (página, filtros, rango). El dueño lo fija `AuthContext` (`setSnapshotOwner`, igual que el token). Las vistas no cambiaron su lógica de carga
+- [x] Vistas cubiertas (servicios con `snapshotGet`):
+  - cliente/distribuidor: `MyOrders` (`/api/orders/mine` y detalle `/api/orders/:id`), `MyNetwork` (`/api/network`), `CommissionsPanel` (`/api/commissions/mine`), `PayoutsPanel` (`/api/payouts/mine`)
   - admin: `Dashboard` (`/api/reports/summary`, `top-products`, `top-sponsors`, `pending-commissions`), `AdminOrders` (`/api/orders`), `AdminPayouts` (`/api/payouts`, `pending-commissions`), `AdminUsers` (`/api/users`), `AdminProducts` (`/api/admin/products`)
-- [ ] Aviso por vista: "Sin conexión — datos guardados el {fecha}"; sin instantánea para esa consulta → "Requiere conexión" (en vez del error genérico)
-- [ ] Paginación y búsqueda sin conexión: solo las combinaciones ya visitadas; el resto muestra "Requiere conexión"
-- [ ] Pendientes del outbox visibles en su vista: pedidos guardados sin red en `MyOrders` como "Pendiente de envío"; ediciones de producto con insignia en `AdminProducts`; cambios de estado en `AdminOrders`
-- [ ] Botones de escritura solo online (crear liquidación, editar usuario, dar de baja) deshabilitados sin red con explicación
-- [ ] Seguridad: instantáneas por usuario; `clearUserData` también borra `snapshots`; caducidad 7 días y límite de entradas por usuario; nunca se guardan `/api/login` ni `/api/me`
-- [ ] Pruebas Vitest: red/instantánea, sin instantánea, `401`/`403`, caducidad, limpieza por usuario
+- [x] Aviso global `OfflineDataBanner` en `Layout` (sin tocar cada vista): "Sin conexión con el servidor: mostrando datos guardados el {fecha}" para las consultas de la página actual servidas desde instantánea (`snapshotStatus`, `useSyncExternalStore`); si combina varias, informa la más antigua. Sin instantánea → la vista muestra "Requiere conexión…" (`errorMessage(err, fallback)` en `apiClient` para `ApiError` y `NetworkError`)
+- [x] Paginación, búsqueda y rangos sin conexión: solo las combinaciones ya visitadas (la clave incluye la query); el resto muestra "Requiere conexión"
+- [x] Pendientes del outbox visibles en su vista: pedidos guardados sin red en `MyOrders` ("Pendientes de envío", con enlace a `/pending`); ediciones de producto con insignia y aviso de altas pendientes en `AdminProducts`; cambios de estado con insignia en `AdminOrders` (`OrderCard.pendingChange`)
+- [x] Botones de escritura solo online deshabilitados sin red con explicación (`title`): "Liquidar" (`AdminPayouts`), rol y activar/desactivar (`AdminUsers`), dar de baja/reactivar (`AdminProducts`)
+- [x] Seguridad: instantáneas por usuario; `clearUserData` (cierre de sesión manual) también borra `snapshots`; `logout` borra el aviso y el dueño; caducidad 7 días y máximo 200 por usuario (se recortan las más viejas); `/api/login` y `/api/me` nunca pasan por `snapshotGet`
+- [ ] Pruebas Vitest (`snapshots.test.ts`): red/instantánea, sin instantánea, aislamiento por usuario, caducidad, `401` borra, `403` no usa, tope de entradas, error inesperado, limpieza al cerrar sesión, estado del aviso — falta ejecutar `npm run test`
+- [ ] Verificación en navegador: visitar con red Dashboard, Mis pedidos, Mi red, Pedidos, Liquidaciones, Usuarios y Productos → Offline + recarga → cada vista muestra sus datos con el aviso de fecha; una página no visitada muestra "Requiere conexión"
 
 ## FASE 9 — Experiencia offline, actualizaciones e instalación
 
@@ -242,7 +243,7 @@ trigger; máquina de estados de pedidos; `APIError{status,message,details}`.
 | 5 | Backend: idempotencia, `version`, `expected_total`, `from_status` | 🟡 Implementada y verificada contra PostgreSQL — falta ejecutar `go test ./...` |
 | 6 | Outbox + motor de sincronización + Background Sync | 🟡 Implementada (`tsc -b`, lint, build y `go vet` OK) — faltan `npm run test` y verificación en navegador |
 | 7 | Resolución de conflictos + vista de pendientes | 🟡 Implementada (`tsc -b`, lint y build OK) — faltan `npm run test` y verificación en navegador |
-| 8 | Lectura offline de datos privados (instantáneas por usuario) + pendientes visibles en sus vistas | ⬜ Pendiente |
+| 8 | Lectura offline de datos privados (instantáneas por usuario) + pendientes visibles en sus vistas | 🟡 Implementada (`tsc -b`, lint y build OK) — faltan `npm run test` y verificación en navegador |
 | 9 | UX offline, actualizaciones, instalación | ⬜ Pendiente |
 | 10 | HTTPS y validación en dispositivos (U4) | ⬜ Pendiente |
 

@@ -12,7 +12,8 @@ import {
 import { useAuth } from '../context/auth';
 import { draftOwner } from '../offline/drafts';
 import { sendOrQueue } from '../offline/outbox';
-import { ApiError } from '../services/apiClient';
+import { useOutbox } from '../offline/outboxContext';
+import { ApiError, errorMessage } from '../services/apiClient';
 import { getOrders, updateOrderStatus, type OrderStatusPayload } from '../services/orderService';
 import OrderCard from './OrderCard';
 import Pagination from './Pagination';
@@ -28,6 +29,9 @@ const AdminOrders = () => {
   // Aviso de un cambio guardado sin conexión (se enviará al volver la red)
   const [notice, setNotice] = useState<string>('');
   const { user } = useAuth();
+  // Cambios de estado guardados sin conexión, por ruta del pedido.
+  const { entries } = useOutbox();
+  const pendingByPath = new Map(entries.filter((e) => e.type === 'order:status').map((e) => [e.path, e.label]));
   // ID del pedido que se está actualizando
   const [savingId, setSavingId] = useState<number | null>(null);
 
@@ -35,7 +39,7 @@ const AdminOrders = () => {
     let active = true;
     getOrders(page, PAGE_SIZE, status)
       .then((r) => active && setResult(r))
-      .catch((err) => active && setError(err instanceof ApiError ? err.message : 'No se pudieron cargar los pedidos'));
+      .catch((err) => active && setError(errorMessage(err, 'No se pudieron cargar los pedidos')));
     return () => {
       active = false;
     };
@@ -81,10 +85,10 @@ const AdminOrders = () => {
           ...prev,
           data: prev.data.map((o) => (o.id === order.id ? { ...o, status: current } : o)),
         });
-        setError(`${err instanceof ApiError ? err.message : ''}: ${orderNumber(order.id)} ya está "${STATUS_LABELS[current]}".`);
+        setError(`${errorMessage(err, '')}: ${orderNumber(order.id)} ya está "${STATUS_LABELS[current]}".`);
         return;
       }
-      setError(err instanceof ApiError ? err.message : 'No se pudo actualizar el pedido');
+      setError(errorMessage(err, 'No se pudo actualizar el pedido'));
     } finally {
       setSavingId(null);
     }
@@ -120,7 +124,8 @@ const AdminOrders = () => {
         <>
           <ul className="space-y-3">
             {result.data.map((order) => (
-              <OrderCard key={order.id} order={order} admin busy={savingId === order.id} onChangeStatus={changeStatus} />
+              <OrderCard key={order.id} order={order} admin busy={savingId === order.id} onChangeStatus={changeStatus}
+                pendingChange={pendingByPath.get(`/api/orders/${order.id}/status`)} />
             ))}
           </ul>
           <Pagination page={result.page} limit={result.limit} total={result.total} onChange={setPage} />

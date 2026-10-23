@@ -79,6 +79,11 @@ export const apiFetch = async <T>(
   return response.json() as Promise<T>;
 };
 
+// Mensaje para el usuario de un error de carga: el del servidor (ApiError) o el de la
+// falta de red (NetworkError, p. ej. "Requiere conexión…"); si no, el texto de respaldo.
+export const errorMessage = (err: unknown, fallback: string): string =>
+  err instanceof ApiError || err instanceof NetworkError ? err.message : fallback;
+
 // Cabecera de idempotencia (opcional) de las escrituras que la PWA puede reintentar.
 export const idempotencyHeaders = (key?: string): Record<string, string> =>
   key ? { 'Idempotency-Key': key } : {};

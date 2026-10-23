@@ -1,6 +1,7 @@
 import type { Page } from '../data/orders';
 import type { Product, ProductInput, ProductUpdate } from '../data/products';
 import { apiFetch, ApiError, idempotencyHeaders, listQuery } from './apiClient';
+import { snapshotGet } from './snapshotClient';
 
 // El catálogo es público: no requiere token.
 export const getProducts = (): Promise<Product[]> =>
@@ -24,7 +25,7 @@ export const getCategories = (): Promise<string[]> => apiFetch<string[]>('/api/c
 
 // Productos paginados, incluidos los dados de baja, con búsqueda por nombre o categoría (?q=).
 export const getAdminProducts = (page: number, limit: number, q: string): Promise<Page<Product>> =>
-  apiFetch<Page<Product>>(`/api/admin/products?${listQuery(page, limit, { q })}`);
+  snapshotGet<Page<Product>>(`/api/admin/products?${listQuery(page, limit, { q })}`);
 
 export const createProduct = (input: ProductInput, idempotencyKey?: string): Promise<Product> =>
   apiFetch<Product>('/api/products', { method: 'POST', body: input, headers: idempotencyHeaders(idempotencyKey) });

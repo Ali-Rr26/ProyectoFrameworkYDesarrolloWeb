@@ -7,7 +7,8 @@ import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { draftOwner } from '../offline/drafts';
 import { recordConflict, sendOrQueue, type OutboxInput } from '../offline/outbox';
 import { productValues } from '../offline/conflicts';
-import { ApiError } from '../services/apiClient';
+import { useOutbox } from '../offline/outboxContext';
+import { ApiError, errorMessage } from '../services/apiClient';
 import {
   createProduct,
   deactivateProduct,
@@ -47,6 +48,10 @@ const AdminProducts = () => {
   // Aviso de un alta/edición guardada sin conexión (se enviará al volver la red)
   const [notice, setNotice] = useState<string>('');
   const { user } = useAuth();
+  // Ediciones y altas guardadas sin conexión; dar de baja/reactivar requiere red.
+  const { entries, online } = useOutbox();
+  const pendingEdits = new Set(entries.filter((e) => e.type === 'product:update').map((e) => e.path));
+  const pendingCreates = entries.filter((e) => e.type === 'product:create');
   const [form, setForm] = useState<FormState>({ mode: 'closed' });
   const [fieldErrors, setFieldErrors] = useState<ProductFieldErrors>({});
   const [saving, setSaving] = useState<boolean>(false);
@@ -56,7 +61,7 @@ const AdminProducts = () => {
   useEffect(() => {
     getCategories()
       .then(setCategories)
-      .catch((err) => setError(err instanceof ApiError ? err.message : 'No se pudieron cargar las categorías'));
+      .catch((err) => setError(errorMessage(err, 'No se pudieron cargar las categorías')));
   }, []);
 
   useEffect(() => {
@@ -65,7 +70,7 @@ const AdminProducts = () => {
       .then((products) => active && setResult({ key, products }))
       .catch((err) => active && setFailure({
         key,
-        message: err instanceof ApiError ? err.message : 'No se pudo cargar el catálogo',
+        message: errorMessage(err, 'No se pudo cargar el catálogo'),
       }));
     return () => {
       active = false;
@@ -156,7 +161,7 @@ const AdminProducts = () => {
       // Baja lógica con DELETE; la reactivación es una edición de "active"
       replace(product.active ? await deactivateProduct(product.id) : await updateProduct(product.id, { active: true, version: product.version }));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'No se pudo actualizar el producto');
+      setError(errorMessage(err, 'No se pudo actualizar el producto'));
     } finally {
       setTogglingId(null);
     }
@@ -197,6 +202,12 @@ const AdminProducts = () => {
         />
       )}
 
+      {pendingCreates.length > 0 && (
+        <div className="bg-amber-50 text-amber-800 p-3 rounded-lg text-sm mb-6 border border-amber-200">
+          Altas pendientes de envío: {pendingCreates.map((e) => e.label.replace(/^Crear /, '')).join(', ')}.
+        </div>
+      )}
+
       <SearchInput id="product-search" label="Buscar" placeholder="Nombre o categoría"
         value={search} onChange={setSearch} />
 
@@ -220,13 +231,19 @@ const AdminProducts = () => {
                     product.active ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-600'}`}>
                     {product.active ? 'Activo' : 'Dado de baja'}
                   </span>
+                  {pendingEdits.has(`/api/products/${product.id}`) && (
+                    <span className="inline-block mt-1 ml-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                      Edición pendiente de envío
+                    </span>
+                  )}
                 </div>
                 <div className="flex flex-col sm:flex-row gap-2">
                   <button type="button" onClick={() => openForm({ mode: 'edit', product })}
                     className="min-h-11 px-4 border border-slate-300 text-slate-700 font-semibold rounded-lg hover:bg-slate-50 transition">
                     Editar
                   </button>
-                  <button type="button" disabled={togglingId === product.id} onClick={() => toggleActive(product)}
+                  <button type="button" disabled={togglingId === product.id || !online} onClick={() => toggleActive(product)}
+                    title={online ? undefined : 'Requiere conexión: esta operación no se puede guardar sin conexión'}
                     className={`min-h-11 px-4 rounded-lg font-semibold transition disabled:opacity-50 ${
                       product.active ? 'border border-red-300 text-red-600 hover:bg-red-50' : 'bg-[#20b2aa] text-white hover:bg-[#008080]'}`}>
                     {togglingId === product.id ? 'Guardando...' : product.active ? 'Dar de baja' : 'Reactivar'}

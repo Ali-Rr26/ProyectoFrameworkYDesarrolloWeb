@@ -6,13 +6,15 @@ import { db, type OfflineDB } from './db';
 export const countPending = (userId: string, database: OfflineDB = db): Promise<number> =>
   database.outbox.where('userId').equals(userId).filter((entry) => entry.status !== 'done').count();
 
-// Cierre de sesión manual: borra borradores y pendientes del usuario. El catálogo es
+// Cierre de sesión manual: borra borradores, pendientes e instantáneas (datos privados
+// guardados para verlos sin conexión) del usuario. El catálogo es
 // público y se conserva. (El cierre automático por token vencido NO llama a esto:
 // los pendientes se envían cuando el mismo usuario vuelve a iniciar sesión.)
 export const clearUserData = (userId: string, database: OfflineDB = db): Promise<void> =>
-  database.transaction('rw', database.drafts, database.outbox, async () => {
+  database.transaction('rw', database.drafts, database.outbox, database.snapshots, async () => {
     await database.drafts.where('userId').equals(userId).delete();
     await database.outbox.where('userId').equals(userId).delete();
+    await database.snapshots.where('userId').equals(userId).delete();
   });
 
 // Pide al navegador no borrar IndexedDB por falta de espacio. El navegador puede negarlo
