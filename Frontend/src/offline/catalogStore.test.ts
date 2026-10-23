@@ -13,6 +13,8 @@ const product = (id: number, name = `Producto ${id}`): Product => ({
   gallery: [],
   stock: 5,
   active: true,
+  version: 1,
+  updated_at: '2026-10-22T00:00:00Z',
 });
 
 let database: OfflineDB;

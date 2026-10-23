@@ -3,8 +3,11 @@ package repository
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 
 	"github.com/jackc/pgx/v5/pgconn"
+
+	"multicatalogo-backend/models"
 )
 
 // Errores del dominio: los controladores los traducen a códigos HTTP sin conocer PostgreSQL.
@@ -32,7 +35,40 @@ var (
 	ErrCommissionsPaid = errors.New("comisiones ya liquidadas")
 	// ErrNothingToPay: el distribuidor no tiene comisiones de pedidos entregados por liquidar (HTTP 409).
 	ErrNothingToPay = errors.New("sin comisiones pendientes")
+	// ErrIdempotencyInProgress: otra petición con la misma Idempotency-Key se está
+	// procesando o acaba de confirmarse (HTTP 409; el reintento recibe la respuesta guardada).
+	ErrIdempotencyInProgress = errors.New("petición con la misma clave en curso")
+	// ErrVersionConflict: el producto cambió desde la versión que editó el cliente (HTTP 409).
+	ErrVersionConflict = errors.New("versión del producto desactualizada")
+	// ErrPriceChanged: el total recalculado no coincide con el que vio el cliente (HTTP 409).
+	ErrPriceChanged = errors.New("los precios cambiaron")
+	// ErrStatusChanged: el pedido ya no está en el estado que vio el cliente (HTTP 409).
+	ErrStatusChanged = errors.New("el estado del pedido cambió")
 )
+
+// VersionConflictError lleva el producto vigente para que el cliente compare y decida.
+type VersionConflictError struct{ Current *models.Product }
+
+func (e *VersionConflictError) Error() string {
+	return fmt.Sprintf("%v: versión vigente %d", ErrVersionConflict, e.Current.Version)
+}
+func (e *VersionConflictError) Unwrap() error { return ErrVersionConflict }
+
+// PriceChangedError lleva el total que vio el cliente y el total vigente.
+type PriceChangedError struct{ Expected, Total float64 }
+
+func (e *PriceChangedError) Error() string {
+	return fmt.Sprintf("%v: esperado %.2f, vigente %.2f", ErrPriceChanged, e.Expected, e.Total)
+}
+func (e *PriceChangedError) Unwrap() error { return ErrPriceChanged }
+
+// StatusChangedError lleva el estado vigente del pedido.
+type StatusChangedError struct{ Current string }
+
+func (e *StatusChangedError) Error() string {
+	return fmt.Sprintf("%v: %s", ErrStatusChanged, e.Current)
+}
+func (e *StatusChangedError) Unwrap() error { return ErrStatusChanged }
 
 // Códigos SQLSTATE de PostgreSQL que traducimos.
 const (

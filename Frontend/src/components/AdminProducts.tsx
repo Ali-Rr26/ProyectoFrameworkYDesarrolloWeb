@@ -84,7 +84,8 @@ const AdminProducts = () => {
     setFieldErrors({});
     try {
       if (form.mode === 'edit') {
-        replace(await updateProduct(form.product.id, input));
+        // Con la versión editada: si otro admin (o una venta) cambió el producto, 409.
+        replace(await updateProduct(form.product.id, { ...input, version: form.product.version }));
       } else {
         // El nuevo producto puede caer en otra página o fuera de la búsqueda: se recarga.
         await createProduct(input);
@@ -112,7 +113,7 @@ const AdminProducts = () => {
     setError('');
     try {
       // Baja lógica con DELETE; la reactivación es una edición de "active"
-      replace(product.active ? await deactivateProduct(product.id) : await updateProduct(product.id, { active: true }));
+      replace(product.active ? await deactivateProduct(product.id) : await updateProduct(product.id, { active: true, version: product.version }));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'No se pudo actualizar el producto');
     } finally {

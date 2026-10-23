@@ -127,20 +127,25 @@
 **Ya existe:** checkout ACID con total recalculado en servidor y stock validado por
 trigger; máquina de estados de pedidos; `APIError{status,message,details}`.
 
-- [ ] Migración `0006_sync.sql`:
-  - `products.version INT NOT NULL DEFAULT 1` y `products.updated_at TIMESTAMPTZ` con trigger que incrementa ambos en cada `UPDATE`
-  - tabla `idempotency_keys(key UUID, user_id, method, path, request_hash, status_code, response_body JSONB, created_at)` con `PRIMARY KEY (user_id, key)`
-- [ ] Middleware `Idempotency` (Fiber) en `POST /api/checkout`, `POST /api/products`, `PUT /api/products/:id`, `PATCH /api/orders/:id/status`:
-  - misma clave y mismo cuerpo → devuelve la respuesta guardada sin reejecutar
-  - misma clave con cuerpo distinto → `422`
-  - clave en curso → `409`
-  - la clave se guarda **en la misma transacción** que la escritura
-- [ ] Limpieza de claves con más de 7 días (al arrancar o con un ticker)
-- [ ] `PUT /api/products/:id` exige `version` (cuerpo o `If-Match`); si no coincide → `409` con el producto actual en `details`
-- [ ] `POST /api/checkout` acepta `expectedTotal`; si el total recalculado difiere → `409 price_changed` con el total nuevo (stock insuficiente sigue en `409` con los productos afectados)
-- [ ] `PATCH /api/orders/:id/status` acepta `fromStatus`; si el pedido ya no está en ese estado → `409` con el estado actual
-- [ ] `GET` de productos devuelve `version` y `updatedAt`
-- [ ] Pruebas Go: idempotencia (reenvío, cuerpo distinto, concurrencia), versión de producto, `expectedTotal`, `fromStatus`
+- [x] Migración `0006_sync.sql`:
+  - `products.version INT NOT NULL DEFAULT 1` y `products.updated_at TIMESTAMPTZ` con trigger `trg_products_version` (`BEFORE UPDATE`) que incrementa ambos en **cada** `UPDATE`, incluido el stock que descuentan las ventas y repone una cancelación (una edición offline de stock no pisa ventas ocurridas mientras tanto)
+  - tabla `idempotency_keys(user_id, key UUID, method, path, request_hash, status_code, response_body JSONB, created_at)` con `PRIMARY KEY (user_id, key)` e índice por `created_at`
+- [x] Middleware `Idempotency` (`controllers/idempotency.go`) después de `RequireAuth` en `POST /api/checkout` (y su alias `POST /api/orders`), `POST /api/products`, `PUT /api/products/:id`, `PATCH /api/orders/:id/status`:
+  - sin cabecera → la petición sigue igual que antes (compatibilidad)
+  - `Idempotency-Key` que no es UUID → `400`
+  - misma clave y misma petición (SHA-256 de método + ruta + cuerpo) → devuelve la respuesta guardada (mismo estado y cuerpo, cabecera `Idempotent-Replayed: true`) sin reejecutar: sin pedido, stock ni comisiones duplicados
+  - misma clave con otra petición → `422`
+  - clave en curso (dos envíos simultáneos) → el segundo espera el `INSERT` del primero y recibe `409`; su reintento obtiene la respuesta guardada
+  - la clave se reserva (`claimIdempotency`) y la respuesta se guarda (`storeIdempotentResponse`) **dentro de la transacción de la escritura**: la clave viaja en el `context` (`repository.WithIdempotencyKey`). Si la escritura hace ROLLBACK, la clave tampoco queda y el reintento vuelve a ejecutarse
+- [x] Limpieza de claves con más de 7 días: `services.RunIdempotencyCleanup` al arrancar y cada 24 h (`idempotencyKeyTTL` en `main.go`)
+- [x] `PUT /api/products/:id` acepta `version` (cuerpo) o `If-Match` (`3`, `"3"` o `W/"3"`); si no coincide con la vigente → `409` con el producto actual en `details`. **Opcional** por compatibilidad (sin versión no se verifica); el frontend ya la envía al editar y reactivar en `AdminProducts`
+- [x] `POST /api/checkout` acepta `expected_total`; si el total recalculado difiere (tolerancia de medio centavo) → ROLLBACK y `409` con `details: { expected_total, total }`. Stock insuficiente sigue en `409` con el producto afectado
+- [x] `PATCH /api/orders/:id/status` acepta `from_status`; si el pedido ya no está en ese estado → `409` con `details: { status }` (se valida antes de la transición)
+- [x] `GET` de productos (público y admin) devuelve `version` y `updated_at`; tipos `Product`/`ProductUpdate` del frontend actualizados
+- [x] CORS: permite las cabeceras `Idempotency-Key` e `If-Match` y expone `Idempotent-Replayed`
+- [x] Nombres JSON en snake_case (`expected_total`, `from_status`, `updated_at`), como el resto de la API (el plan decía `expectedTotal`/`fromStatus`)
+- [ ] Pruebas Go (`controllers/idempotency_test.go`, `controllers/sync_test.go`, `repository/sync_test.go`, `services/idempotency_cleanup_test.go`): middleware (sin cabecera, UUID inválido, clave nueva en contexto, repetición, cuerpo distinto, fallo del almacén), mapeo de conflictos a `409`, `If-Match`, `expected_total`, `from_status`, tolerancia de totales, limpieza — falta ejecutar `go test ./...`
+- [x] Verificación contra la base real (PowerShell, 2026-10-22): reenvío del checkout con la misma clave → `201` + `201 Idempotent-Replayed` con el mismo pedido (#9); misma clave con otro cuerpo → `422`; `expected_total` incorrecto → `409` con el total vigente; `If-Match` viejo → `409` con el producto vigente (versión 2: la venta del pedido #9 la subió); `from_status` viejo → `409` con `pending`
 
 ## FASE 6 — Outbox y motor de sincronización
 
@@ -228,7 +233,7 @@ trigger; máquina de estados de pedidos; `APIError{status,message,details}`.
 | 2 | SW `injectManifest` + manifest → instalable, interfaz offline | 🟡 Implementada (`tsc -b`, lint y build OK) — falta verificación en navegador |
 | 3 | Caché HTTP pública (catálogo, imágenes) | 🟡 Implementada (`tsc -b`, lint y build OK) — faltan `npm run test` y verificación en navegador |
 | 4 | IndexedDB (Dexie): catálogo local + borradores | 🟡 Implementada (`tsc -b`, lint y build OK) — faltan `npm run test` y verificación en navegador |
-| 5 | Backend: idempotencia, `version`, `expectedTotal`, `fromStatus` | ⬜ Pendiente |
+| 5 | Backend: idempotencia, `version`, `expected_total`, `from_status` | 🟡 Implementada y verificada contra PostgreSQL — falta ejecutar `go test ./...` |
 | 6 | Outbox + motor de sincronización + Background Sync | ⬜ Pendiente |
 | 7 | Resolución de conflictos + vista de pendientes | ⬜ Pendiente |
 | 8 | Lectura offline de datos privados (instantáneas por usuario) + pendientes visibles en sus vistas | ⬜ Pendiente |

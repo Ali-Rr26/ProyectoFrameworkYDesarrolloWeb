@@ -32,6 +32,11 @@ type Product struct {
 	// Active es false cuando el producto fue dado de baja (baja lógica): no se vende ni
 	// aparece en el catálogo público, pero sigue en el historial de pedidos.
 	Active bool `json:"active"`
+	// Version aumenta con cada cambio de la fila (incluido el stock que descuentan las
+	// ventas): es el token de concurrencia optimista de PUT /api/products/:id.
+	Version int `json:"version"`
+	// UpdatedAt es la fecha del último cambio.
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // APIError estandariza respuestas de error HTTP.
@@ -123,6 +128,9 @@ type ProductUpdate struct {
 	Image       *string   `json:"image"`
 	Gallery     *[]string `json:"gallery"`
 	Active      *bool     `json:"active"`
+	// Version es la versión que el cliente editó (cuerpo o cabecera If-Match). Si viene y
+	// el producto ya cambió, la edición se rechaza con 409 en lugar de pisar el cambio.
+	Version *int `json:"version"`
 }
 
 // RegisterRequest es el cuerpo esperado para registrar un cliente (POST /api/users).
@@ -157,6 +165,9 @@ type CreateOrderRequest struct {
 	City            string           `json:"city"`
 	Phone           string           `json:"phone"`
 	Items           []OrderItemInput `json:"items"`
+	// ExpectedTotal es el total que vio el cliente (opcional). Si los precios cambiaron y
+	// el total recalculado difiere, el pedido se rechaza con 409 en lugar de cobrar otro monto.
+	ExpectedTotal *float64 `json:"expected_total"`
 }
 
 // OrderItem es una línea del pedido ya registrado, con el precio aplicado.
@@ -174,4 +185,11 @@ type Order struct {
 	Status    string      `json:"status"`
 	Total     float64     `json:"total"`
 	Items     []OrderItem `json:"items"`
+}
+
+// IdempotencyRecord es la respuesta guardada de una escritura con Idempotency-Key.
+type IdempotencyRecord struct {
+	RequestHash string
+	StatusCode  int
+	Body        []byte
 }

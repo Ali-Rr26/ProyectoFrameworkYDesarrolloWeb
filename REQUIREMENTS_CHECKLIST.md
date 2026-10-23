@@ -152,7 +152,9 @@ React SPA (:5173) ──► Caddy/Nginx (U4: proxy inverso + SSL)
 - [ ] Pruebas de la capa local (`npm run test`) y verificación offline en navegador
 
 ## PWA-F5 · Backend preparado para sincronizar
-- [ ] Migración `0006_sync.sql` (`products.version`/`updated_at`, `idempotency_keys`), middleware `Idempotency`, `409` por `version`, `expectedTotal` y `fromStatus`, pruebas Go
+- [x] Migración `0006_sync.sql` (`products.version`/`updated_at`, `idempotency_keys`), middleware `Idempotency` con la clave guardada en la misma transacción, limpieza a 7 días, `409` por `version`/`If-Match`, `expected_total` y `from_status`, CORS
+- [x] Verificación contra PostgreSQL (idempotencia, `expected_total`, `If-Match`, `from_status`)
+- [ ] Pruebas Go (`go test ./...`)
 
 ## PWA-F6 · Outbox y motor de sincronización
 - [ ] `NetworkError` en `apiClient`, `enqueue` con UUID, estados `pending/syncing/done/conflict/failed`, FIFO por usuario, `navigator.locks`, backoff, pausa en `401`, disparo por `online`/arranque/login/Background Sync, botón "Sincronizar ahora" en `Navbar`, `Checkout` sin red → "Guardar pedido"
