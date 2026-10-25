@@ -1,0 +1,31 @@
+# Caddyfile incluido en la imagen del frontend (Heroku): un solo sitio en el puerto que
+# asigna Heroku ($PORT; 80 si no existe). El HTTPS lo ponen Cloudflare y el router de
+# Heroku. En la VM, deploy/docker-compose.prod.yml monta deploy/Caddyfile encima de este.
+{
+	admin off
+	auto_https off
+}
+
+:{$PORT:80} {
+	root * /srv
+	encode zstd gzip
+
+	header Strict-Transport-Security "max-age=31536000"
+	header X-Content-Type-Options "nosniff"
+	header Referrer-Policy "strict-origin-when-cross-origin"
+
+	# Los assets llevan hash en el nombre: se cachean para siempre. Un asset que no existe
+	# (hash de una versión anterior) responde 404: nunca index.html con tipo HTML.
+	handle /assets/* {
+		header Cache-Control "public, max-age=31536000, immutable"
+		file_server
+	}
+
+	# Todo lo demás se revalida siempre (sw.js, manifest, íconos e index.html, también en
+	# las rutas de la SPA): si quedara en la caché HTTP, el aviso de nueva versión no llegaría.
+	handle {
+		header Cache-Control "no-cache"
+		try_files {path} /index.html
+		file_server
+	}
+}
