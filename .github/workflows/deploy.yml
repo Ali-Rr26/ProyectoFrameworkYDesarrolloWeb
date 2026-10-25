@@ -1,15 +1,16 @@
-# Despliegue continuo: cuando CI termina bien en un push a main (o a mano desde la
-# pestaña Actions, solo sobre main), el servidor actualiza su clon y reconstruye el stack.
+# Despliegue continuo en Heroku: cuando CI termina bien en un push a main (o a mano desde la
+# pestaña Actions, solo sobre main), construye las imágenes de la API y de la PWA desde el
+# commit que pasó CI, las sube al registro de Heroku y las publica.
 #
-# Corre en un runner self-hosted instalado en el propio servidor: el runner abre una
-# conexión saliente hacia GitHub, así que no hace falta exponer SSH ni puertos (el
-# tráfico web ya entra por Cloudflare Tunnel). Preparación, una sola vez:
-#   1) Settings -> Actions -> Runners -> New self-hosted runner (Linux), con la etiqueta
-#      multicatalogo-prod; instalarlo como servicio (./svc.sh install && ./svc.sh start).
-#      El usuario del runner debe poder usar docker (grupo docker).
-#   2) Clonar el repositorio en el servidor (p. ej. /opt/multicatalogo) con una deploy key
-#      de solo lectura, y crear ahí deploy/.env y deploy/cloudflared/ (fuera de git).
-#   3) Settings -> Environments -> production, y en Variables: DEPLOY_PATH=/opt/multicatalogo.
+# Preparación, una sola vez (ver GUIA_DESPLIEGUE.md):
+#   - Dos apps de Heroku con stack container: la API (con Heroku Postgres y sus variables)
+#     y la PWA, cada una con su dominio propio.
+#   - Settings -> Environments -> production:
+#       secret   HEROKU_API_KEY   (heroku authorizations:create -d "GitHub Actions")
+#       variable HEROKU_API_APP   (p. ej. multicatalogo-api)
+#       variable HEROKU_WEB_APP   (p. ej. multicatalogo-web)
+#       variable DOMAIN           (alissonreyes.me)
+#       variable API_DOMAIN       (api.alissonreyes.me)
 name: Deploy
 
 on:
@@ -29,48 +30,71 @@ permissions:
 
 jobs:
   deploy:
-    name: Desplegar en producción
+    name: ${{ matrix.name }}
     if: >-
       (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
       (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
-    runs-on: [self-hosted, linux, multicatalogo-prod]
+    runs-on: ubuntu-latest
     environment: production
-    timeout-minutes: 30
+    timeout-minutes: 20
+    strategy:
+      # Si falla una imagen, la otra se publica igual (son independientes).
+      fail-fast: false
+      matrix:
+        include:
+          - name: API (Heroku)
+            app_var: HEROKU_API_APP
+            context: Backend
+            health_path: /api/health
+            domain_var: API_DOMAIN
+          - name: PWA (Heroku)
+            app_var: HEROKU_WEB_APP
+            context: Frontend
+            health_path: /
+            domain_var: DOMAIN
     env:
-      DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
-      # Exactamente el commit que pasó CI (o el último de main si es manual).
-      SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+      HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+      APP: ${{ vars[matrix.app_var] }}
+      HOST: ${{ vars[matrix.domain_var] }}
     steps:
-      - name: Actualizar el código del servidor
-        run: |
-          test -n "$DEPLOY_PATH" || { echo "::error::Definir la variable DEPLOY_PATH del environment production"; exit 1; }
-          cd "$DEPLOY_PATH"
-          git fetch --prune origin
-          # El clon del servidor es un espejo de main: los archivos versionados quedan
-          # como en el commit; .env y cloudflared/ (ignorados) no se tocan.
-          git reset --hard "$SHA"
+      - uses: actions/checkout@v7
+        with:
+          # Exactamente el commit que pasó CI (o el último de main si es manual).
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
-      - name: Construir y levantar el stack
-        working-directory: ${{ vars.DEPLOY_PATH }}/deploy
-        # --wait: falla si un servicio no llega a sano (la API aplica las migraciones al arrancar).
-        run: docker compose -f docker-compose.prod.yml up -d --build --remove-orphans --wait --wait-timeout 300
-
-      - name: Comprobar la API y la PWA por HTTPS
-        working-directory: ${{ vars.DEPLOY_PATH }}/deploy
+      - name: Iniciar sesión en el registro de Heroku
         run: |
-          domain=$(grep -E '^DOMAIN=' .env | cut -d= -f2-)
-          api=$(grep -E '^API_DOMAIN=' .env | cut -d= -f2-)
-          for attempt in $(seq 1 12); do
-            if curl -fsS "https://$api/api/health" && curl -fsS -o /dev/null "https://$domain/"; then
-              echo; echo "Despliegue OK: https://$domain"
+          test -n "$HEROKU_API_KEY" -a -n "$APP" -a -n "$HOST" || { echo "::error::Faltan el secreto HEROKU_API_KEY o las variables del environment production"; exit 1; }
+          echo "$HEROKU_API_KEY" | docker login --username=_ --password-stdin registry.heroku.com
+
+      - name: Construir y subir la imagen
+        env:
+          # Solo la PWA la usa: se fija en el bundle al compilar.
+          VITE_API_URL: https://${{ vars.API_DOMAIN }}
+        run: |
+          image="registry.heroku.com/$APP/web"
+          # Sin attestations: el registro de Heroku solo acepta un manifiesto de imagen simple.
+          docker build --provenance=false --build-arg VITE_API_URL="$VITE_API_URL" -t "$image" "${{ matrix.context }}"
+          docker push "$image"
+          echo "IMAGE_ID=$(docker inspect "$image" --format='{{.Id}}')" >> "$GITHUB_ENV"
+
+      - name: Publicar en Heroku
+        run: |
+          curl -fsS -X PATCH "https://api.heroku.com/apps/$APP/formation" \
+            -H "Authorization: Bearer $HEROKU_API_KEY" \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/vnd.heroku+json; version=3.docker-releases" \
+            -d "{\"updates\":[{\"type\":\"web\",\"docker_image\":\"$IMAGE_ID\"}]}" > /dev/null
+
+      - name: Comprobar por HTTPS
+        run: |
+          # Margen para el arranque del dyno (la API aplica las migraciones al iniciar).
+          for attempt in $(seq 1 24); do
+            if curl -fsS -o /dev/null "https://$HOST${{ matrix.health_path }}"; then
+              echo "Despliegue OK: https://$HOST${{ matrix.health_path }}"
               exit 0
             fi
             sleep 5
           done
-          echo "::error::La API o la PWA no responden por HTTPS"
-          docker compose -f docker-compose.prod.yml ps
-          docker compose -f docker-compose.prod.yml logs --tail 50 backend web cloudflared
+          echo "::error::https://$HOST${{ matrix.health_path }} no responde; revisa heroku logs --tail -a $APP"
           exit 1
-
-      - name: Borrar imágenes sin uso
-        run: docker image prune -f
