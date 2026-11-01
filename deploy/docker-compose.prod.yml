@@ -22,7 +22,7 @@ services:
       retries: 10
 
   redis:
-    image: redis:8.10.2-alpine
+    image: redis:8.10.3-alpine
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -71,7 +71,7 @@ services:
   # deploy/cloudflared/ contiene config.yml (rutas dominio -> http://web:80) y
   # credentials.json (secreto del túnel); ambos fuera de git.
   cloudflared:
-    image: cloudflare/cloudflared:2026.10.3
+    image: cloudflare/cloudflared:2026.10.6
     restart: unless-stopped
     command: tunnel --no-autoupdate --config /etc/cloudflared/config.yml run
     volumes:
